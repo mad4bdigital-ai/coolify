@@ -1,0 +1,27 @@
+# Reference staging service for Coolify's "Docker Compose" resource.
+# No public host ports, no replacement of the existing Coolify container.
+# The upstream proxy provides OAuth endpoints and a /mcp mount.
+# Configure HTTPS domain routing to port 8080 in Coolify itself.
+# Do not commit any real token/secret. All ${...} values are set privately at deployment time.
+services:
+  coolify-mcp-oauth:
+    image: ghcr.io/babs/mcp-auth-proxy:2.1.0
+    restart: unless-stopped
+    environment:
+      PROD_MODE: "true"
+      PROXY_BASE_URL: "${PROXY_BASE_URL:?HTTPS adapter URL required}"
+      UPSTREAM_MCP_URL: "${UPSTREAM_MCP_URL:?Native Coolify MCP URL required}"
+      UPSTREAM_AUTHORIZATION_HEADER: "${UPSTREAM_AUTHORIZATION_HEADER:?Bearer Coolify read token required}"
+      OIDC_ISSUER_URL: "${OIDC_ISSUER_URL:?OIDC issuer required}"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:?OIDC client ID required}"
+      OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:?OIDC client secret required}"
+      TOKEN_SIGNING_SECRET: "${TOKEN_SIGNING_SECRET:?Signing secret required}"
+      REDIS_URL: "${REDIS_URL:?Dedicated Redis required}"
+    expose:
+      - "8080"
+    # COOLIFY: configure a dedicated HTTPS hostname mapped to container port 8080.
+    # No host port binding, no Docker daemon/root privileges, no volumes required.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
