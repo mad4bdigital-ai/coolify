@@ -1,6 +1,6 @@
 # Google OIDC staging setup for Coolify MCP OAuth bridge
 
-**Status:** GitHub-ready template only. No Google OAuth client, Redis service, proxy, DNS or ChatGPT connector has been provisioned.
+**Status:** User confirmed an existing Google OAuth web client has been updated with the adapter callback URI on 2026-10-13. Its credentials and OIDC audience settings have not been independently verified. No adapter, Redis, DNS or ChatGPT connector deployment has been verified.
 
 ## Selection
 
@@ -11,9 +11,9 @@ This is a temporary **testing** solution. Google's OAuth consent-screen **Testin
 ## Google Cloud Console setup — no credentials in GitHub
 
 1. In Google Cloud Console → Google Auth Platform, create/select a test-only project and configure OAuth branding/consent. Choose audience **External**, publishing state **Testing** and add only authorized Google accounts as **test users**. Do not make the application public.
-2. Create an OAuth client with application type **Web application**, display name `mad4b-coolify-mcp-staging`.
+2. Reuse the existing **Web application** OAuth client. If the existing client is shared with other applications, preserve all existing Authorized redirect URIs and assess whether a dedicated client is preferable before production.
 3. Under **Authorized redirect URIs**, register exactly:
-   `https://YOUR-STAGING-ADAPTER-HOST/callback`.
+   `https://coolify-mcp.infra.mad4b.com/callback`.
    This is the upstream proxy's OIDC callback, **not ChatGPT's redirect URL**. Underlying OAuth from ChatGPT uses the adapter's own registration and discovery endpoints.
 4. Set `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` privately in the *new staging resource's* Coolify environment. Do not paste the secret in chats, GitHub PRs, workflows, or Google Drive.
 5. Use the exact `OIDC_ISSUER_URL=https://accounts.google.com`; keep Google test-user allowlist restricted during staging.
@@ -24,7 +24,7 @@ Use `compose.yaml` in a **new** Docker Compose resource, not the platform's inte
 
 Example non-secret variables:
 ```text
-PROXY_BASE_URL=https://YOUR-STAGING-ADAPTER-HOST
+PROXY_BASE_URL=https://coolify-mcp.infra.mad4b.com
 OIDC_ISSUER_URL=https://accounts.google.com
 UPSTREAM_MCP_URL=https://coolify.infra.mad4b.com/mcp
 ```
