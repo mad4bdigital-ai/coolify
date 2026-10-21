@@ -31,6 +31,9 @@ services:
 
   oauth-redis:
     image: redis:7-alpine
+    # Run as the image's unprivileged redis user from the outset.
+    # Avoid root entrypoint setpriv/setresuid under no-new-privileges.
+    user: "redis"
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     expose:
