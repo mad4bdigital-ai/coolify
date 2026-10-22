@@ -4,7 +4,9 @@
 # Do not deploy on the production VPS without a reviewed staging rollout.
 services:
   coolify-mcp-oauth:
-    image: ghcr.io/babs/mcp-auth-proxy:2.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       oauth-redis:
@@ -21,6 +23,12 @@ services:
       REDIS_URL: "redis://oauth-redis:6379/0"
     expose:
       - "8080"
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - default
       - oauth-state
