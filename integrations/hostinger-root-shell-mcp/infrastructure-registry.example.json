@@ -1,0 +1,13 @@
+{
+  "targets": [
+    {
+      "id": "hostinger-primary",
+      "kind": "ssh",
+      "label": "Hostinger KVM8 primary VPS",
+      "environment": "production",
+      "host": "187.7.76.129",
+      "port": 22,
+      "enabled": true
+    }
+  ]
+}
