@@ -26,3 +26,20 @@ Acceptance:
 - Added scoped GitHub Actions workflow `.github/workflows/hostinger-infrastructure-registry.yml`, which does not read deployment credentials.
 - Any new host must be explicitly enrolled in the registry. No automatic probing or access to hosts outside the registry is authorized by this feature.
 - Integration tests against new external infrastructure are still pending.
+
+
+## Provider adapters — current scope
+
+The `providers.py` module and exposed MCP tools provide **unauthenticated** checks for enrolled targets:
+
+- `probe_registered_target(target_id, timeout_seconds=5)`: bounded TCP handshake for SSH/SFTP/MySQL/Postgres/HTTPS; returns `authenticated=false` and `data_access_verified=false`, even when reachable.
+- `probe_registered_https(target_id)`: TLS-verified HTTPS HEAD for a registered `wordpress` or `https_api` origin; no redirects or credential headers.
+- Both reject unknown and disabled inventory entries.
+
+**Authentication and data transfer remain separate pending features.** A TCP handshake cannot prove access to a database, SSH user, or WordPress account. No credentials should be embedded into `infrastructure-registry.json`, passed as MCP tool arguments, or committed to this repository.
+
+### Planned credential boundary
+
+Each target will reference an operator-approved secret binding by stable identifier. The binding will be resolved only inside the service from an isolated secret store or read-only mount; tools will expose the binding status and provider type, never secret values. Actual authenticated sessions require independent tests with least-privilege accounts, TLS/SSH host verification and audit logging.
+
+Current production deployment source is still `feat/hostinger-root-shell-mcp`, not this branch.
