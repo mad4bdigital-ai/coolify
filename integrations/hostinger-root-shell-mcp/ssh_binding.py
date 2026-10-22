@@ -59,3 +59,91 @@ def summarize_ssh_binding(target: dict) -> dict:
         "authenticated": False,
         "data_access_verified": False,
     }
+
+
+async def probe_authenticated_ssh(target_id: str) -> dict:
+    """One bounded, non-mutating SSH auth proof for an enrolled target.
+
+    The only remote command is a fixed printf sentinel. Never return SSH
+    stdout/stderr, key material, or permit caller-controlled commands.
+    """
+    import asyncio
+    from providers import registered_target
+
+    target = registered_target(target_id)
+    if target["kind"] != "ssh" or target_id == "hostinger-primary":
+        raise ValueError("target is not an external SSH account")
+    if not target.get("username"):
+        raise ValueError("target has no enrolled username")
+    directory = BINDING_DIRECTORY / target_id
+    readiness = summarize_ssh_binding(target)
+    base = {
+        "target_id": target_id,
+        "port": target["port"] or 22,
+        "authenticated": False,
+        "data_access_verified": False,
+        "mutation_performed": False,
+    }
+    if readiness["status"] != "identity_prepared_host_key_file_present":
+        return {**base, "status": readiness["status"]}
+
+    hostfile = directory / "known_hosts_verified"
+    # Refuse an untrusted/symlinked file or a pin for the wrong enrolled host.
+    if not _regular_file(hostfile, private=True):
+        return {**base, "status": "verified_host_key_file_invalid"}
+    try:
+        pins = hostfile.read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeError):
+        return {**base, "status": "verified_host_key_file_invalid"}
+    required_host = f'[{target["host"]}]:{base["port"]}'
+    valid_pins = [x.split() for x in pins if x.strip() and not x.lstrip().startswith("#")]
+    if not any(len(v) >= 3 and required_host in v[0].split(",") for v in valid_pins):
+        return {**base, "status": "target_host_key_pin_missing"}
+
+    argv = [
+        "ssh", "-F", "/dev/null", "-T",
+        "-p", str(base["port"]),
+        "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes",
+        "-o", "PreferredAuthentications=publickey",
+        "-o", "PasswordAuthentication=no",
+        "-o", "KbdInteractiveAuthentication=no",
+        "-o", "StrictHostKeyChecking=yes",
+        "-o", "UpdateHostKeys=no",
+        "-o", "HostKeyAlgorithms=ssh-ed25519",
+        "-o", "GlobalKnownHostsFile=/dev/null",
+        "-o", "UserKnownHostsFile=" + str(hostfile),
+        "-o", "ConnectionAttempts=1",
+        "-o", "ConnectTimeout=8",
+        "-i", str(directory / "id_ed25519"),
+        target["username"] + "@" + target["host"],
+        "printf MAD4B_SSH_AUTH_OK",
+    ]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=18)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            return {**base, "status": "connection_timeout"}
+    except OSError:
+        return {**base, "status": "ssh_client_unavailable"}
+
+    if proc.returncode == 0 and stdout == b"MAD4B_SSH_AUTH_OK":
+        return {**base, "status": "authenticated", "authenticated": True,
+                "data_access_verified": True}
+    error = stderr.decode("utf-8", "replace").lower()
+    if "host key verification failed" in error or "remote host identification has changed" in error:
+        category = "host_key_verification_failed"
+    elif "permission denied" in error or "publickey" in error:
+        category = "public_key_auth_denied"
+    elif "connection refused" in error:
+        category = "connection_refused"
+    elif "timed out" in error:
+        category = "connection_timeout"
+    else:
+        category = "authentication_or_remote_probe_failed"
+    return {**base, "status": category}
