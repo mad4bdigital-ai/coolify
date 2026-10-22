@@ -22,6 +22,8 @@ services:
         bind:
           create_host_path: false
     shm_size: "1gb"
+    ports:
+      - "127.0.0.1:13001:3001"
     expose:
       - "3001"
     networks:
@@ -30,6 +32,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
 
 networks:
   browser-access:
