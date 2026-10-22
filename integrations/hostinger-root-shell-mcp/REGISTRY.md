@@ -57,3 +57,16 @@ Important: This stage does not claim to have authenticated to hPanel. Every acco
 Next integration boundary: individually provision limited-scope hPanel API credentials in a secure per-account secret mount; inspect official endpoint availability and scopes before implementing live read-only inventory. Require explicit approval and verified source/destination for data movement. No mailbox transfer to VPS.
 
 The running Registry resource must not be redeployed until CI and OAuth acceptance are complete.
+
+## Hostinger API read-only adapter
+
+Added tools:
+- `hostinger_account_binding_status()` returns only whether a token file exists for each alias.
+- `list_hostinger_websites(target_id)` performs a read-only GET against the official `/api/hosting/v1/websites` endpoint after resolving the account alias; results are projected to domain/type/username.
+
+Expected operator-provisioned read-only secret paths (NOT committed):
+- `/run/secrets/hostinger-accounts/cloud-startup.token`
+- `/run/secrets/hostinger-accounts/allroyalegypt.token`
+- `/run/secrets/hostinger-accounts/egypttourgates.token`
+
+Credentials must be separately mounted read-only into the Registry container before live API use. No secrets are currently provisioned by this branch, and source hPanel identities are not assumed to be authorized by existing SSH credentials. Do not expose email mailbox data, or enable write operations. The current adapter does not export database or website backups.
