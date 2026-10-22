@@ -9,7 +9,7 @@ async function scan() {
     const [res]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
       if(location.hostname!=="hpanel.hostinger.com" || !location.pathname.startsWith("/websites"))
         return {status:"WEBSITES_PAGE_REQUIRED",sites:[]};
-      const domainPattern=/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,24}$/i;
+      const domainPattern=/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/i;
       const excluded=new Set(["gmail.com","outlook.com","hotmail.com","yahoo.com","icloud.com"]);
       const results=new Map();
       const nodes=[...document.querySelectorAll("a,button,[role='link'],[data-testid],h2,h3,h4,p,span")];
@@ -21,7 +21,7 @@ async function scan() {
         const blob=(ancestor.innerText||"").trim();
         if(blob.length>1600 || blob.length<label.length)continue;
         const domain=label.toLowerCase();
-        const title=blob.split("\\n").map(x=>x.trim()).filter(Boolean);
+        const title=blob.split("\n").map(x=>x.trim()).filter(Boolean);
         results.set(domain,{domain,card_text:title.slice(0,12).join(" | ").slice(0,500),
           evidence:"domain_element_in_card",account:null,plan:null,status:null});
       }
