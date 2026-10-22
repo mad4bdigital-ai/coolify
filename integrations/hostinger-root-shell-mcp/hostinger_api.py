@@ -63,3 +63,40 @@ def list_websites(target_id: str) -> dict:
                        "username": item.get("username")})
     return {"target_id": target_id, "status": "ok", "websites": result,
             "count": len(result), "secrets_included": False}
+
+# Explicit fixed GET-only API diagnostics. Never accepts caller-provided URLs.
+READ_ONLY_CHECKS = {
+    "catalog": "/api/billing/v1/catalog",
+    "subscriptions": "/api/billing/v1/subscriptions",
+    "hosting_orders": "/api/hosting/v1/orders",
+    "websites": "/api/hosting/v1/websites",
+}
+
+def diagnose_read_only_endpoints(target_id: str) -> dict:
+    """Verify API accessibility without exposing body, credentials or billing data."""
+    if target_id not in ACCOUNT_MAP:
+        raise ValueError("target is not enrolled")
+    alias = ACCOUNT_MAP[target_id]
+    path = CREDENTIAL_DIRECTORY / (alias + ".token")
+    if not path.is_file() or path.is_symlink():
+        return {"target_id": target_id, "status": "credential_not_configured", "checks": []}
+    token = path.read_text(encoding="utf-8").strip()
+    if not token or "\n" in token or "\r" in token:
+        raise ValueError("invalid credential")
+    results = []
+    for label, endpoint in READ_ONLY_CHECKS.items():
+        request = urllib.request.Request(
+            API_BASE + endpoint,
+            headers={"Authorization": "Bearer " + token, "Accept": "application/json"},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                results.append({"operation": label, "http_status": response.status})
+        except urllib.error.HTTPError as exc:
+            results.append({"operation": label, "http_status": exc.code})
+            exc.close()
+        except Exception as exc:
+            results.append({"operation": label, "error_type": type(exc).__name__})
+    return {"target_id": target_id, "checks": results, "read_only": True,
+            "response_bodies_included": False, "secrets_included": False}
