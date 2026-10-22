@@ -1,0 +1,39 @@
+# MAD4B Secure Browser Workspace — isolated, opt-in Coolify resource.
+# No public ports, OAuth worker or Registry dependencies.
+# Access requires a separately configured authenticated TLS gateway.
+services:
+  mad4b-secure-browser:
+    image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    restart: unless-stopped
+    environment:
+      PUID: "${BROWSER_UID:-1000}"
+      PGID: "${BROWSER_GID:-1000}"
+      TZ: "${BROWSER_TZ:-Africa/Cairo}"
+    volumes:
+      - type: bind
+        source: "${BROWSER_CONFIG_DIR:?Required dedicated persistent browser directory}"
+        target: /config
+        bind:
+          create_host_path: false
+      # Auth state is not part of /config and is never committed to Git.
+      - type: bind
+        source: "${BROWSER_OAUTH_STATE_DIR:?Required dedicated OAuth secrets directory}"
+        target: /run/mad4b-oauth-state
+        bind:
+          create_host_path: false
+    shm_size: "1gb"
+    expose:
+      - "3001"
+    networks:
+      - browser-access
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  browser-access:
+    # Deliberately no published ports. Do not attach to the shell/Registry networks.
+    # A trusted SSO/MFA gateway may be explicitly attached after acceptance.
+    name: mad4b-browser-access
+    internal: false
