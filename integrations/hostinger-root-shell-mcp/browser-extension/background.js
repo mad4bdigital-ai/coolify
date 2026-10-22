@@ -55,9 +55,11 @@ async function scan() {
           plan_expires:group?.plan_expires||null,group_evidence:group?.group_evidence||null};
         results.set(domain,site);
       }
-      return {status:"SCOPED_CARD_CANDIDATES",sites:[...results.values()].slice(0,100)};
+      const unresolved=[...new Set((document.body?.innerText?.match(allDomains)||[]).map(x=>x.toLowerCase()))]
+        .filter(x=>!excluded.has(x)&&!results.has(x)).slice(0,100);
+      return {status:"SCOPED_CARD_CANDIDATES",sites:[...results.values()].slice(0,100),unresolved_domains:unresolved};
     }});
-    return {ok:true,status:res.result?.status||"NO_RESULT",source:"hpanel-card-dom",sites:res.result?.sites||[],domains:(res.result?.sites||[]).map(x=>x.domain)};
+    return {ok:true,status:res.result?.status||"NO_RESULT",source:"hpanel-card-dom",sites:res.result?.sites||[],unresolved_domains:res.result?.unresolved_domains||[],domains:(res.result?.sites||[]).map(x=>x.domain)};
   } catch(_) {return {ok:false,status:"TAB_INSPECTION_FAILED",domains:[]};}
 }
 async function tick(){
