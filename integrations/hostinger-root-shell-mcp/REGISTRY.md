@@ -43,3 +43,17 @@ The `providers.py` module and exposed MCP tools provide **unauthenticated** chec
 Each target will reference an operator-approved secret binding by stable identifier. The binding will be resolved only inside the service from an isolated secret store or read-only mount; tools will expose the binding status and provider type, never secret values. Actual authenticated sessions require independent tests with least-privilege accounts, TLS/SSH host verification and audit logging.
 
 Current production deployment source is still `feat/hostinger-root-shell-mcp`, not this branch.
+
+## Hostinger Multi-Account Gateway — initial implementation
+
+The gateway currently records three independent hPanel account aliases: `cloud-startup`, `allroyalegypt` and `egypttourgates` bound respectively to `hosting-1`, `hosting-2` and `hosting-3`.
+
+MCP tools:
+- `list_hostinger_hpanel_accounts()`: non-secret routing metadata and capability catalog.
+- `plan_hostinger_import(target_id, category)`: a read-only plan targeting `hostinger-primary`. Categories: inventory, websites, databases, backups and domains. Mail is intentionally excluded.
+
+Important: This stage does not claim to have authenticated to hPanel. Every account reports `credential_binding=not_configured`. No hPanel API requests, backup exports, secret provisioning, migrations or DNS changes are performed by these tools.
+
+Next integration boundary: individually provision limited-scope hPanel API credentials in a secure per-account secret mount; inspect official endpoint availability and scopes before implementing live read-only inventory. Require explicit approval and verified source/destination for data movement. No mailbox transfer to VPS.
+
+The running Registry resource must not be redeployed until CI and OAuth acceptance are complete.
