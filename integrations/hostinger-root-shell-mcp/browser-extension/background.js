@@ -26,7 +26,7 @@ async function scan() {
           const text=(parent.innerText||"").trim();
           if(!text || text.length>24000) break;
           if(!siteCard && text.length<1800 && text.includes(label) &&
-             /manage site/i.test(text)) {
+             (/manage site/i.test(text) || (/AI Builder/i.test(text) && /Created\s+\d{4}-\d{2}-\d{2}/i.test(text)))) {
             const found=[...new Set((text.match(allDomains)||[])
               .map(x=>x.toLowerCase()).filter(x=>!excluded.has(x)))];
             if(found.length===1 && found[0]===domain) siteCard=parent;
