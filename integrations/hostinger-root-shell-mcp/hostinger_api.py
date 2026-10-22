@@ -94,7 +94,27 @@ def diagnose_read_only_endpoints(target_id: str) -> dict:
             with urllib.request.urlopen(request, timeout=10) as response:
                 results.append({"operation": label, "http_status": response.status})
         except urllib.error.HTTPError as exc:
-            results.append({"operation": label, "http_status": exc.code})
+            # Hostinger publishes a safe, human-readable error message.
+            # Return only a fixed classification, never a response body or token.
+            category = "unknown"
+            try:
+                payload = json.loads(exc.read(4096))
+                message = str(payload.get("message", "")).lower() if isinstance(payload, dict) else ""
+                if "forbidden" in message or "permission" in message or "access denied" in message:
+                    category = "access_denied"
+                elif "unauthenticated" in message or "invalid token" in message:
+                    category = "authentication_failed"
+                elif "not found" in message:
+                    category = "not_found"
+                elif "rate limit" in message or "too many" in message:
+                    category = "rate_limited"
+                elif message:
+                    category = "other_api_rejection"
+            except (ValueError, UnicodeError, OSError):
+                category = "non_json_or_unreadable_error"
+            results.append({"operation": label, "http_status": exc.code,
+                            "error_category": category,
+                            "content_type": str(exc.headers.get("Content-Type", ""))[:70]})
             exc.close()
         except Exception as exc:
             results.append({"operation": label, "error_type": type(exc).__name__})
