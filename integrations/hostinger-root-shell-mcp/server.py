@@ -6,29 +6,12 @@ Each invocation is a fresh remote bash process (not a persistent terminal).
 import asyncio
 import os
 import shlex
-from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
-KEY_DIR = Path("/run/secrets/ssh")
+KEY = "/run/secrets/hostinger_root_ssh_key"
 KNOWN_HOSTS = "/run/secrets/hostinger_known_hosts"
-EXPECTED_KEY_NAME = os.environ.get("SHELL_SSH_KEY_NAME", "").strip()
-
-def discover_key() -> str:
-    """Discover one approved mounted key only, never scan host filesystem."""
-    if not KEY_DIR.is_dir():
-        raise RuntimeError("Approved SSH key directory not mounted")
-    keys = sorted(
-        p for p in KEY_DIR.iterdir()
-        if p.is_file() and not p.is_symlink()
-        and not p.name.endswith(".pub")
-    )
-    if EXPECTED_KEY_NAME:
-        keys = [p for p in keys if p.name == EXPECTED_KEY_NAME]
-    if len(keys) != 1:
-        raise RuntimeError(f"Expected exactly one approved mounted SSH key, found {len(keys)}")
-    return str(keys[0])
 MAX_OUTPUT = 256 * 1024
 
 server = FastMCP(
@@ -50,8 +33,6 @@ async def exec_root_shell(command: str, timeout_seconds: int = 60) -> dict:
     if not command or not command.strip():
         return {"error": "command is empty"}
     timeout = min(max(int(timeout_seconds), 1), 300)
-    if not os.path.isfile(KNOWN_HOSTS):
-        return {"error": "Verified SSH known_hosts file not mounted"}
     remote = "bash -lc " + shlex.quote(command)
     argv = [
         "ssh", "-T", "-p", PORT,
@@ -60,7 +41,7 @@ async def exec_root_shell(command: str, timeout_seconds: int = 60) -> dict:
         "-o", "StrictHostKeyChecking=yes",
         "-o", "UserKnownHostsFile=" + KNOWN_HOSTS,
         "-o", "ConnectTimeout=10",
-        "-i", discover_key(),
+        "-i", KEY,
         "root@" + HOST, remote,
     ]
     process = await asyncio.create_subprocess_exec(
