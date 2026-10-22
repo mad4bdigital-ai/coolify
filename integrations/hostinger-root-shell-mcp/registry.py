@@ -8,6 +8,7 @@ import os
 import re
 import ipaddress
 from pathlib import Path
+from ssh_binding import summarize_ssh_binding
 
 REGISTRY_FILE = Path(os.environ.get("INFRA_REGISTRY_FILE", "/app/infrastructure-registry.json"))
 VALID_ID = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
@@ -78,5 +79,12 @@ def list_targets(environment: str = "", kind: str = "") -> dict:
         if (not environment or target["environment"] == environment)
         and (not kind or target["kind"] == kind)
     ]
-    return {"configured": data["configured"], "count": len(filtered),
-            "targets": filtered, "secrets_included": False}
+    # Annotate SSH inventory with non-secret live file-presence checks.
+    # A prepared identity is never proof of remote acceptance.
+    presented = [
+        {**target, "ssh_binding": summarize_ssh_binding(target)}
+        if target["kind"] == "ssh" else target
+        for target in filtered
+    ]
+    return {"configured": data["configured"], "count": len(presented),
+            "targets": presented, "secrets_included": False}
