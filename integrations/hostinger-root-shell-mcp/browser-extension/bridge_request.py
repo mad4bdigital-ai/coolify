@@ -6,7 +6,7 @@ import urllib.request
 import urllib.error
 
 BASE = "http://127.0.0.1:13872"
-TOKEN_FILE = pathlib.Path("/config/hpanel-reader-extension/bridge-token")
+TOKEN_FILE = pathlib.Path("/config/mad4b-bridge-private/token")
 
 def main():
     token=TOKEN_FILE.read_text().strip()
