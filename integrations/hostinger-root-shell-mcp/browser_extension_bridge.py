@@ -39,6 +39,7 @@ async def extension_inventory() -> dict:
                     and DOMAIN.fullmatch(x["domain"]) and x["domain"].lower() not in EXCLUDED_NON_WEBSITE_DOMAINS]
         return {"ok":data.get("ok") is True,
                 "sites":safe_sites,
+                "unresolved_domains":[d for d in (data.get("unresolved_domains") or [])[:100] if isinstance(d,str) and DOMAIN.fullmatch(d) and d.lower() not in EXCLUDED_NON_WEBSITE_DOMAINS],
                 "status":str(data.get("status",""))[:64],
                 "source":"hpanel-visible-dom",
                 "verified_inventory":False,
