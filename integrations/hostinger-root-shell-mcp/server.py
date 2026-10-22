@@ -9,6 +9,7 @@ import shlex
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from registry import list_targets
+from ssh_binding import probe_authenticated_ssh
 from providers import check_reachability, check_https_api
 from hostinger_gateway import list_hostinger_accounts, plan_import
 from hostinger_api import binding_status, list_websites, diagnose_read_only_endpoints
@@ -60,6 +61,15 @@ async def probe_registered_target(target_id: str, timeout_seconds: int = 5) -> d
 async def probe_registered_https(target_id: str) -> dict:
     """Check HTTPS reachability for registered web endpoints."""
     return await check_https_api(target_id)
+
+@server.tool()
+async def authenticate_registered_ssh(target_id: str) -> dict:
+    """Verify a pre-enrolled external SSH account with pinned host key.
+
+    Runs a fixed, harmless probe; no caller-controlled remote commands or
+    credential disclosure.
+    """
+    return await probe_authenticated_ssh(target_id)
 
 @server.tool()
 def list_hostinger_hpanel_accounts() -> dict:
