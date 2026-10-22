@@ -28,7 +28,11 @@ async def extension_inventory() -> dict:
         if not isinstance(data,dict):raise ValueError("shape")
         domains=data.get("domains",[])
         if not isinstance(domains,list):raise ValueError("domains")
-        sites=data.get("sites",[])\n        if not isinstance(sites,list):raise ValueError("sites")\n        safe_sites=[{"domain":x["domain"],"evidence":"domain_element_in_card","card_text":str(x.get("card_text",""))[:500],"account":None,"plan":None,"site_status":None} for x in sites[:100] if isinstance(x,dict) and isinstance(x.get("domain"),str) and DOMAIN.fullmatch(x["domain"]) and x["domain"].lower() not in EXCLUDED_NON_WEBSITE_DOMAINS]\n        return {"ok":data.get("ok") is True,\n                "sites":safe_sites,
+        sites=data.get("sites",[])
+        if not isinstance(sites,list):raise ValueError("sites")
+        safe_sites=[{"domain":x["domain"],"evidence":"domain_element_in_card","card_text":str(x.get("card_text",""))[:500],"account":None,"plan":None,"site_status":None} for x in sites[:100] if isinstance(x,dict) and isinstance(x.get("domain"),str) and DOMAIN.fullmatch(x["domain"]) and x["domain"].lower() not in EXCLUDED_NON_WEBSITE_DOMAINS]
+        return {"ok":data.get("ok") is True,
+                "sites":safe_sites,
                 "status":str(data.get("status",""))[:64],
                 "source":"hpanel-visible-dom",
                 "verified_inventory":False,
