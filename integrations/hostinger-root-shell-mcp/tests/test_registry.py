@@ -21,10 +21,11 @@ class RegistryTests(unittest.TestCase):
         self.path.write_text(json.dumps({"targets": entries}), encoding="utf-8")
 
     def entry(self, **changes):
-        return dict({"id": "hostinger_primary", "kind": "ssh",
-                     "label": "Primary", "environment": "production",
-                     "host": "187.7.76.129", "port": 22, "enabled": True},
-                    **changes)
+        data = {"id": "hostinger_primary", "kind": "ssh",
+                "label": "Primary", "environment": "production",
+                "host": "187.7.76.129", "port": 22, "enabled": True}
+        data.update(changes)
+        return data
 
     def test_unconfigured(self):
         self.assertEqual(registry.list_targets(), {
