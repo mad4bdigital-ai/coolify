@@ -6,7 +6,7 @@ Each invocation is a fresh remote bash process (not a persistent terminal).
 import asyncio
 import os
 import shlex
-from mcp.server import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -14,8 +14,12 @@ KEY = "/run/secrets/hostinger_root_ssh_key"
 KNOWN_HOSTS = "/run/secrets/hostinger_known_hosts"
 MAX_OUTPUT = 256 * 1024
 
-server = MCPServer(
+server = FastMCP(
     "Hostinger VPS root shell",
+    host="0.0.0.0",
+    port=8000,
+    json_response=True,
+    stateless_http=True,
     instructions="Root-level shell on the enrolled VPS. All commands run as root via SSH. Commands may change or delete production data. Never claim commands are read-only unless they are.",
 )
 
@@ -63,4 +67,4 @@ async def exec_root_shell(command: str, timeout_seconds: int = 60) -> dict:
     }
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", host="0.0.0.0", port=8000, json_response=True)
+    server.run(transport="streamable-http")
