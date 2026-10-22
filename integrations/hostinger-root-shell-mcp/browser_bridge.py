@@ -45,7 +45,7 @@ async def query_hpanel_worker(action: str) -> dict:
         items = data.get("websites", [])
         if not isinstance(items, list):
             raise ValueError("invalid websites")
-        return {"ok": bool(data.get("ok")), "websites": [
+        return {"ok": bool(data.get("ok")), "status": str(data.get("status", ""))[:80], "websites": [
             {"name": str(x.get("name", ""))[:160], "domain": str(x.get("domain", ""))[:253]}
             for x in items[:100] if isinstance(x, dict)]}
     except (OSError, ValueError, asyncio.TimeoutError, json.JSONDecodeError):
