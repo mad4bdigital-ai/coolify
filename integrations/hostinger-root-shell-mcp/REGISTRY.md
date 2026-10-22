@@ -19,3 +19,10 @@ Acceptance:
 5. Confirm the original `infra.mad4b` and deployed Shell resource remain unchanged.
 
 **No deployment is included in this PR.** Create a separate test resource or explicitly approve the new branch as a deployment source after validation.
+
+## Completed development checks (source)
+
+- Added offline tests for missing inventory, filtering, duplicate/invalid IDs, host and port validation, IPv6, and secret-field exclusion.
+- Added scoped GitHub Actions workflow `.github/workflows/hostinger-infrastructure-registry.yml`, which does not read deployment credentials.
+- Any new host must be explicitly enrolled in the registry. No automatic probing or access to hosts outside the registry is authorized by this feature.
+- Integration tests against new external infrastructure are still pending.
