@@ -52,7 +52,7 @@ def summarize_ssh_binding(target: dict) -> dict:
 
     return {
         "status": status,
-        "private_identity_present_and_mode_safe": private_ready,
+        "ssh_identity_present_mode_safe": private_ready,
         "public_identity_present": public_ready,
         "host_key_candidate_present": candidate,
         "verified_host_key_file_present": pinned,
