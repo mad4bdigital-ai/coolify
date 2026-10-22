@@ -1,17 +1,23 @@
 {
   "manifest_version": 3,
   "name": "MAD4B hPanel Inventory Reader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Explicit read-only inventory snapshot from the active hPanel tab.",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "alarms",
+    "tabs"
   ],
   "host_permissions": [
-    "https://hpanel.hostinger.com/*"
+    "https://hpanel.hostinger.com/*",
+    "http://127.0.0.1:13872/*"
   ],
   "action": {
     "default_title": "Read hPanel inventory",
     "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
   }
 }
