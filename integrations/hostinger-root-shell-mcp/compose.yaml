@@ -24,12 +24,7 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      - type: bind
-        source: "${HOSTINGER_TOKEN_DIRECTORY:-/opt/hostinger-shell-mcp/hpanel-tokens}"
-        target: /run/secrets/hostinger-accounts
-        read_only: true
-        bind:
-          create_host_path: false
+      - /opt/hostinger-shell-mcp/hpanel-tokens:/run/secrets/hostinger-accounts:ro
     expose:
       - "8000"
     networks: [shell-private, default]
