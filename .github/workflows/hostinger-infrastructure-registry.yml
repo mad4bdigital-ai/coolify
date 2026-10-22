@@ -28,4 +28,4 @@ jobs:
       - name: Run dependency-free tests
         run: PYTHONPATH=. python -m unittest discover -s tests -v
       - name: Validate sample JSON and approved fields
-        run: python -c 'import registry; assert registry.list_targets()["count"] == 1'
+        run: INFRA_REGISTRY_FILE=./infrastructure-registry.example.json python -c 'import registry; assert registry.list_targets()["count"] == 4'
