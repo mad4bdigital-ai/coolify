@@ -14,6 +14,7 @@ from providers import check_reachability, check_https_api
 from hostinger_gateway import list_hostinger_accounts, plan_import
 from hostinger_api import binding_status, list_websites, diagnose_read_only_endpoints
 from browser_bridge import query_hpanel_worker
+from browser_extension_bridge import extension_inventory
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -95,6 +96,15 @@ def list_hostinger_websites(target_id: str) -> dict:
 def diagnose_hostinger_api_read_only(target_id: str) -> dict:
     """Test allowlisted GET-only Hostinger endpoints; return status codes only."""
     return diagnose_read_only_endpoints(target_id)
+
+@server.tool()
+async def browser_read_hpanel_domains() -> dict:
+    """Read domain CANDIDATES from authenticated Chromium's visible hPanel tab.
+
+    Results are unverified candidates, not authoritative website inventory.
+    Never returns cookies, tokens, raw page text or browser storage.
+    """
+    return await extension_inventory()
 
 @server.tool()
 async def browser_session_status() -> dict:
