@@ -10,8 +10,20 @@ services:
       SHELL_SSH_HOST: "${SHELL_SSH_HOST:?VPS address required}"
       SHELL_SSH_PORT: "${SHELL_SSH_PORT:-22}"
     volumes:
-      - "${SHELL_KEY_DIRECTORY:?Operator-approved key directory required}:/run/secrets/ssh-keys:ro"
-      - "${ROOT_SSH_KNOWN_HOSTS_PATH:?Pinned known_hosts path required}:/run/secrets/hostinger_known_hosts:ro"
+      # Long-form binds prevent Coolify from interpreting placeholder text as
+      # Docker's short source:target:mode syntax. No auto-created key paths.
+      - type: bind
+        source: "${SHELL_KEY_DIRECTORY:-/opt/hostinger-shell-mcp/ssh-keys}"
+        target: /run/secrets/ssh-keys
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${ROOT_SSH_KNOWN_HOSTS_PATH:-/opt/hostinger-shell-mcp/known_hosts}"
+        target: /run/secrets/hostinger_known_hosts
+        read_only: true
+        bind:
+          create_host_path: false
     expose:
       - "8000"
     networks: [shell-private]
