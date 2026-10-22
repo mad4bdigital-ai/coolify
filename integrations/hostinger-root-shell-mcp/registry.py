@@ -27,6 +27,13 @@ def validate_host(value: object) -> str:
         raise ValueError("invalid host format")
     return value
 
+def validate_username(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", value):
+        raise ValueError("invalid SSH username")
+    return value
+
 def validate_port(value: object) -> int | None:
     if value is None:
         return None
@@ -59,6 +66,7 @@ def load_registry() -> dict:
             "environment": str(item.get("environment", "unknown"))[:60],
             "host": validate_host(item.get("host")),
             "port": validate_port(item.get("port")),
+            "username": validate_username(item.get("username")),
             "enabled": item.get("enabled", True) is True,
         })
     return {"targets": targets, "configured": True}
