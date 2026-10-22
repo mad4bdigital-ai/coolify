@@ -6,11 +6,30 @@ Each invocation is a fresh remote bash process (not a persistent terminal).
 import asyncio
 import os
 import shlex
+from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
-KEY = "/run/secrets/hostinger_root_ssh_key"
+KEY_DIRECTORY = Path("/run/secrets/ssh-keys")
+
+def available_keys() -> dict[str, Path]:
+    """Only enumerate explicitly mounted SSH key files in this container."""
+    if not KEY_DIRECTORY.is_dir():
+        return {}
+    return {
+        p.name: p
+        for p in sorted(KEY_DIRECTORY.iterdir())
+        if p.is_file() and not p.is_symlink()
+        and not p.name.endswith(".pub")
+        and p.name not in ("known_hosts", "config")
+    }
+
+@server.tool()
+def list_ssh_keys() -> dict:
+    """List key choices, not key material. An explicit choice is required."""
+    return {"choices": list(available_keys()), "key_material_included": False}
+
 KNOWN_HOSTS = "/run/secrets/hostinger_known_hosts"
 MAX_OUTPUT = 256 * 1024
 
@@ -24,7 +43,7 @@ server = FastMCP(
 )
 
 @server.tool()
-async def exec_root_shell(command: str, timeout_seconds: int = 60) -> dict:
+async def exec_root_shell(command: str, key_name: str = "", timeout_seconds: int = 60) -> dict:
     """Execute a bash command as root on Hostinger VPS. No command allowlist.
 
     Executes in a NEW bash shell for each call. Requires an authorized root SSH
@@ -33,6 +52,9 @@ async def exec_root_shell(command: str, timeout_seconds: int = 60) -> dict:
     if not command or not command.strip():
         return {"error": "command is empty"}
     timeout = min(max(int(timeout_seconds), 1), 300)
+    keys = available_keys()
+    if key_name not in keys:
+        return {"selection_required": True, "choices": list(keys)}
     remote = "bash -lc " + shlex.quote(command)
     argv = [
         "ssh", "-T", "-p", PORT,
@@ -41,7 +63,7 @@ async def exec_root_shell(command: str, timeout_seconds: int = 60) -> dict:
         "-o", "StrictHostKeyChecking=yes",
         "-o", "UserKnownHostsFile=" + KNOWN_HOSTS,
         "-o", "ConnectTimeout=10",
-        "-i", KEY,
+        "-i", str(keys[key_name]),
         "root@" + HOST, remote,
     ]
     process = await asyncio.create_subprocess_exec(
