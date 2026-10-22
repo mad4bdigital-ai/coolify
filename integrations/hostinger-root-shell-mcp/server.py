@@ -12,6 +12,7 @@ from registry import list_targets
 from providers import check_reachability, check_https_api
 from hostinger_gateway import list_hostinger_accounts, plan_import
 from hostinger_api import binding_status, list_websites, diagnose_read_only_endpoints
+from browser_bridge import query_hpanel_worker
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -84,6 +85,16 @@ def list_hostinger_websites(target_id: str) -> dict:
 def diagnose_hostinger_api_read_only(target_id: str) -> dict:
     """Test allowlisted GET-only Hostinger endpoints; return status codes only."""
     return diagnose_read_only_endpoints(target_id)
+
+@server.tool()
+async def browser_session_status() -> dict:
+    """Read hPanel browser session state without accessing tokens or cookies."""
+    return await query_hpanel_worker("session_status")
+
+@server.tool()
+async def browser_list_websites() -> dict:
+    """List websites through optional local read-only hPanel browser worker."""
+    return await query_hpanel_worker("list_websites")
 
 @server.tool()
 def list_ssh_keys() -> dict:
