@@ -5,6 +5,7 @@ or infer that an authorized_keys copy proves live SSH authentication.
 """
 import os
 import stat
+import asyncio
 from pathlib import Path
 
 BINDING_DIRECTORY = Path(os.environ.get("INFRA_SSH_BINDINGS_DIR", "/run/secrets/external-targets"))
@@ -67,7 +68,6 @@ async def probe_authenticated_ssh(target_id: str) -> dict:
     The only remote command is a fixed printf sentinel. Never return SSH
     stdout/stderr, key material, or permit caller-controlled commands.
     """
-    import asyncio
     from providers import registered_target
 
     target = registered_target(target_id)
