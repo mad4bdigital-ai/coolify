@@ -99,8 +99,8 @@ def diagnose_read_only_endpoints(target_id: str) -> dict:
             category = "unknown"
             try:
                 payload = json.loads(exc.read(4096))
-                message = str(payload.get("message", "")).lower() if isinstance(payload, dict) else ""
-                if "forbidden" in message or "permission" in message or "access denied" in message:
+                message = " ".join(str(payload.get(k, "")) for k in ("message", "error", "detail", "title")).lower()[:512] if isinstance(payload, dict) else ""
+                if "forbidden" in message or "permission" in message or "access denied" in message or "not authorized" in message:
                     category = "access_denied"
                 elif "unauthenticated" in message or "invalid token" in message:
                     category = "authentication_failed"
