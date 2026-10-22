@@ -35,3 +35,21 @@ This directory provides a *deployment template*, **not a forked implementation**
 | Rollback | removes adapter only |
 
 **Status:** Template committed; not deployed or tested. No credentials requested in GitHub.
+
+
+## Live staging acceptance and pending hardening — 22 Oct 2026
+
+- Resource: `kj048gjsiptuxet1jfqjhzaz` in `Infrastructure Integrations / staging`. This logical environment shares the VPS with production workloads.
+- Deployed commit: `00d4ce4f39737545beff8ea58e13b7518d64f09a`. Redis starts successfully with `user: redis`; prior `setpriv` failure fixed.
+- Verified: TLS trust; `/healthz` 200; OAuth discovery 200; protected-resource metadata 200; unauthenticated `/mcp` 401; Google login and token 200; authenticated ChatGPT `server/discover` 200 and `tools/list` 200. Native MCP `initialize` and `server/discover` 200. Direct ChatGPT calls to `coolify_help` and `get_infrastructure_overview` succeeded.
+- Coolify readback: app running, zero restarts, `health_check_enabled=false`, `running:unknown`.
+
+### Pending Coolify UI configuration (not performed through read-only MCP)
+
+1. In `Environment Variables`, `OIDC_CLIENT_SECRET`, `UPSTREAM_AUTHORIZATION_HEADER`, and `TOKEN_SIGNING_SECRET` are currently both build-time and runtime. Prefer **runtime-only** and masked values, but test carefully: Coolify's Compose deployment interpolates environment variables. If build-time deactivation breaks interpolation, halt and plan a secret-injection alternative; never expose secrets in rendered Compose or logs.
+2. In the application's healthcheck settings, set an HTTP check on internal port `8080`, path `/healthz`, method GET, expected 200, scheme http. Do not use `/` (404 by design). Verify Coolify's Docker Compose support and that the probe targets the adapter rather than Redis.
+3. Once these settings are reviewed and applied to this resource only, verify Redis healthy; adapter healthy/running; valid HTTPS; successful authenticated ChatGPT read tool invocation. Do not change Traefik, global Docker, or core Coolify Redis.
+4. Preserve a least-privilege `read` Coolify API token. All allowed Google identities share this upstream team credential; enforce a durable identity allowlist before broader use. Google OAuth Testing mode alone is not a long-term authorization policy.
+5. Keep the PR in draft and separate production rollout from this staging acceptance; image digest/provenance and secret-injection design remain review items.
+
+No secret value belongs in Git or chat. The above hardening steps are **pending**, not claimed deployed.
