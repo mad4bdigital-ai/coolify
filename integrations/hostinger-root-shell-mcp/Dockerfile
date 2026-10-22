@@ -2,7 +2,7 @@ FROM python:3.12-slim-bookworm
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssh-client ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir "mcp>=1.12,<3.0"
+RUN pip install --no-cache-dir "mcp>=1.12,<2.0"
 WORKDIR /app
 COPY server.py /app/server.py
 EXPOSE 8000
