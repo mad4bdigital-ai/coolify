@@ -1,0 +1,63 @@
+# Separate experimental root-shell MCP stack. NEVER deploy without private
+# SSH credentials, host-key verification and OAuth access controls.
+services:
+  shell-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SHELL_SSH_HOST: "${SHELL_SSH_HOST:?VPS address required}"
+      SHELL_SSH_PORT: "${SHELL_SSH_PORT:-22}"
+    volumes:
+      - "${ROOT_SSH_PRIVATE_KEY_PATH:?Existing private key path required}:/run/secrets/hostinger_root_ssh_key:ro"
+      - "${ROOT_SSH_KNOWN_HOSTS_PATH:?Pinned known_hosts path required}:/run/secrets/hostinger_known_hosts:ro"
+    expose:
+      - "8000"
+    networks: [shell-private]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  shell-oauth:
+    image: ghcr.io/babs/mcp-auth-proxy:2.1.0
+    restart: unless-stopped
+    depends_on: [shell-mcp, oauth-redis]
+    environment:
+      PROD_MODE: "true"
+      OIDC_ISSUER_URL: "https://accounts.google.com"
+      OIDC_CLIENT_ID: "${SHELL_OIDC_CLIENT_ID:?Google client ID required}"
+      OIDC_CLIENT_SECRET: "${SHELL_OIDC_CLIENT_SECRET:?Google client secret required}"
+      PROXY_BASE_URL: "${SHELL_PROXY_BASE_URL:?Dedicated HTTPS domain required}"
+      UPSTREAM_MCP_URL: "http://shell-mcp:8000/mcp"
+      TOKEN_SIGNING_SECRET: "${SHELL_TOKEN_SIGNING_SECRET:?Strong signing secret required}"
+      REDIS_URL: "redis://oauth-redis:6379/0"
+    expose:
+      - "8080"
+    networks: [default, shell-private, oauth-private]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  oauth-redis:
+    image: redis:7-alpine
+    user: redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    expose: ["6379"]
+    networks: [oauth-private]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+networks:
+  shell-private:
+    internal: true
+  oauth-private:
+    internal: true
