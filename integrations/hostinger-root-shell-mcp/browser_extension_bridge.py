@@ -30,7 +30,13 @@ async def extension_inventory() -> dict:
         if not isinstance(domains,list):raise ValueError("domains")
         sites=data.get("sites",[])
         if not isinstance(sites,list):raise ValueError("sites")
-        safe_sites=[{"domain":x["domain"],"evidence":"domain_element_in_card","card_text":str(x.get("card_text",""))[:500],"account":None,"plan":None,"site_status":None} for x in sites[:100] if isinstance(x,dict) and isinstance(x.get("domain"),str) and DOMAIN.fullmatch(x["domain"]) and x["domain"].lower() not in EXCLUDED_NON_WEBSITE_DOMAINS]
+        safe_sites=[{"domain":x["domain"],"evidence":str(x.get("evidence") or "")[:64],
+                     "site_type":x.get("site_type"),"created_on":x.get("created_on"),
+                     "account_email":x.get("account_email"),"hosting_plan":x.get("hosting_plan"),
+                     "plan_expires":x.get("plan_expires"),"site_status":None,
+                     "group_evidence":x.get("group_evidence")}
+                    for x in sites[:100] if isinstance(x,dict) and isinstance(x.get("domain"),str)
+                    and DOMAIN.fullmatch(x["domain"]) and x["domain"].lower() not in EXCLUDED_NON_WEBSITE_DOMAINS]
         return {"ok":data.get("ok") is True,
                 "sites":safe_sites,
                 "status":str(data.get("status",""))[:64],
