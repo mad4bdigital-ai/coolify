@@ -11,6 +11,7 @@ from mcp.server.fastmcp import FastMCP
 from registry import list_targets
 from providers import check_reachability, check_https_api
 from hostinger_gateway import list_hostinger_accounts, plan_import
+from hostinger_api import binding_status, list_websites
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -68,6 +69,16 @@ def list_hostinger_hpanel_accounts() -> dict:
 def plan_hostinger_import(target_id: str, category: str = "websites") -> dict:
     """Prepare a review-only import route without contacting or changing systems."""
     return plan_import(target_id, category)
+
+@server.tool()
+def hostinger_account_binding_status() -> dict:
+    """Read per-account credential provisioning status without revealing secrets."""
+    return binding_status()
+
+@server.tool()
+def list_hostinger_websites(target_id: str) -> dict:
+    """Read approved Hostinger hPanel website inventory for an enrolled account."""
+    return list_websites(target_id)
 
 @server.tool()
 def list_ssh_keys() -> dict:
