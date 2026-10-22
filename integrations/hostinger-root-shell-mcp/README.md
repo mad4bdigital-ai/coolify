@@ -44,3 +44,16 @@ Build the image in an isolated environment; test MCP initialize, tools/list, rej
 ## Rollback
 
 Disable/delete the **new shell resource**, then remove its dedicated root public key from `authorized_keys`. This does not require any change to the existing Coolify MCP proxy.
+
+
+## Selecting from multiple existing SSH keys
+
+The application lists keys only from the operator-approved host directory mounted by `SHELL_KEY_DIRECTORY` (mapped read-only to `/run/secrets/ssh-keys`). It does **not** scan the VPS filesystem or the existing Coolify deployment's secrets.
+
+- `list_ssh_keys()` returns available **file names only**; never key contents.
+- `exec_root_shell(command, key_name, timeout_seconds)` requires an exact `key_name` from that list. If no key is chosen or the name is unavailable, it returns `selection_required=true` with choices, without executing a command.
+- Multiple keys are valid, and no key is auto-selected; the user or caller chooses for each command.
+- Keep `ROOT_SSH_KNOWN_HOSTS_PATH` pinned to independently verified host keys. A listed key does not imply SSH authentication or Root access will succeed.
+- The account behind Google OAuth controls access to this MCP endpoint; for unrestricted Root execution, Google sign-in must be restricted to the explicitly approved operator(s). The shell code contains no separate account registry.
+
+**Do not mount a broad SSH folder containing unrelated credentials.** Create a dedicated directory containing only the specific existing key files authorized for this service. Key paths remain on the VPS, never in GitHub.
