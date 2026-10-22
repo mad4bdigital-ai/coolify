@@ -25,10 +25,6 @@ def available_keys() -> dict[str, Path]:
         and p.name not in ("known_hosts", "config")
     }
 
-@server.tool()
-def list_ssh_keys() -> dict:
-    """List key choices, not key material. An explicit choice is required."""
-    return {"choices": list(available_keys()), "key_material_included": False}
 
 KNOWN_HOSTS = "/run/secrets/hostinger_known_hosts"
 MAX_OUTPUT = 256 * 1024
@@ -41,6 +37,11 @@ server = FastMCP(
     stateless_http=True,
     instructions="Root-level shell on the enrolled VPS. All commands run as root via SSH. Commands may change or delete production data. Never claim commands are read-only unless they are.",
 )
+
+@server.tool()
+def list_ssh_keys() -> dict:
+    """List mounted SSH key choices without exposing secret contents."""
+    return {"choices": list(available_keys()), "key_material_included": False}
 
 @server.tool()
 async def exec_root_shell(command: str, key_name: str = "", timeout_seconds: int = 60) -> dict:
