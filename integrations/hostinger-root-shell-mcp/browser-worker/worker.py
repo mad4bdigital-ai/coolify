@@ -21,13 +21,12 @@ def inspect(action):
             url = urlsplit(page.url)
             if url.scheme != "https" or url.hostname not in ("hpanel.hostinger.com", "auth.hostinger.com"):
                 return {"ok": False, "status": "UNEXPECTED_REDIRECT"}
-            logged_in = (url.hostname == "hpanel.hostinger.com" and
-                         not any(v in url.path.lower() for v in ("login", "signin")))
+            # Redirect URL alone is insufficient evidence of authentication.
+            # Until a known signed-in hPanel element is certified, fail closed.
             if action == "session_status":
-                return {"ok": True, "authenticated": logged_in,
-                        "status": "AUTHENTICATED" if logged_in else "LOGIN_REQUIRED", "account_alias": ""}
-            if not logged_in:
-                return {"ok": False, "websites": [], "status": "LOGIN_REQUIRED"}
+                return {"ok": True, "authenticated": False,
+                        "status": "UNVERIFIED_SESSION", "account_alias": ""}
+            return {"ok": False, "websites": [], "status": "SELECTOR_NOT_CERTIFIED"}
             # Do not infer websites from unstructured text; selectors must be
             # accepted against the real hPanel DOM before enabling extraction.
             return {"ok": False, "websites": [], "status": "SELECTOR_NOT_CERTIFIED"}
