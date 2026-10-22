@@ -1,0 +1,27 @@
+# Optional standalone service; not referenced by the running Registry stack.
+# Run only for authorized, interactive OAuth enrollment; no API token inherited.
+services:
+  hostinger-cloud-startup-oauth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mad4b/hostinger-cloud-startup-oauth:3.4.0
+    profiles: ["manual-oauth"]
+    stdin_open: true
+    tty: true
+    user: "10001:10001"
+    environment:
+      HOME: /home/hostinger
+      DEBUG: "false"
+    volumes:
+      - type: bind
+        source: ${HOSTINGER_OAUTH_STATE_DIR:?Set isolated OAuth state directory}
+        target: /home/hostinger/.config/hostinger-mcp
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    network_mode: bridge
+    restart: "no"

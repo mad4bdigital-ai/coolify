@@ -1,0 +1,16 @@
+[Unit]
+Description=MAD4B local hPanel Chromium extension relay
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/docker exec -i --user 1000:1000 mad4b-secure-browser-mad4b-secure-browser-1 sh /config/hpanel-reader-extension/start-bridge.sh
+ExecStop=/usr/bin/docker exec --user 1000:1000 mad4b-secure-browser-mad4b-secure-browser-1 sh /config/hpanel-reader-extension/stop-bridge.sh
+Restart=always
+RestartSec=20
+TimeoutStopSec=20
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

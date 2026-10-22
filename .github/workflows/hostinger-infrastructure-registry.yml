@@ -1,0 +1,33 @@
+name: Hostinger Infrastructure Registry checks
+on:
+  push:
+    branches:
+      - feat/dynamic-infrastructure-registry
+    paths:
+      - 'integrations/hostinger-root-shell-mcp/**'
+      - '.github/workflows/hostinger-infrastructure-registry.yml'
+  pull_request:
+    paths:
+      - 'integrations/hostinger-root-shell-mcp/**'
+      - '.github/workflows/hostinger-infrastructure-registry.yml'
+permissions:
+  contents: read
+jobs:
+  offline-registry-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/hostinger-root-shell-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Python syntax
+        run: python -m compileall -q registry.py providers.py hostinger_gateway.py hostinger_api.py server.py tests
+      - name: Run dependency-free tests
+        run: PYTHONPATH=. python -m unittest discover -s tests -v
+      - name: Validate modules included in container image
+        run: python -c "from pathlib import Path; assert 'ssh_binding.py' in Path('Dockerfile').read_text(), 'SSH binding module not copied into image'"
+      - name: Validate sample JSON and approved fields
+        run: INFRA_REGISTRY_FILE=./infrastructure-registry.example.json python -c 'import registry; assert registry.list_targets()["count"] == 4'
