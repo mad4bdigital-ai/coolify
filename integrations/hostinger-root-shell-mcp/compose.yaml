@@ -10,7 +10,7 @@ services:
       SHELL_SSH_HOST: "${SHELL_SSH_HOST:?VPS address required}"
       SHELL_SSH_PORT: "${SHELL_SSH_PORT:-22}"
     volumes:
-      - "${ROOT_SSH_PRIVATE_KEY_PATH:?Existing private key path required}:/run/secrets/hostinger_root_ssh_key:ro"
+      - "${SHELL_KEY_DIRECTORY:?Operator-approved key directory required}:/run/secrets/ssh-keys:ro"
       - "${ROOT_SSH_KNOWN_HOSTS_PATH:?Pinned known_hosts path required}:/run/secrets/hostinger_known_hosts:ro"
     expose:
       - "8000"
