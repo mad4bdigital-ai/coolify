@@ -9,6 +9,7 @@ import shlex
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from registry import list_targets
+from providers import check_reachability, check_https_api
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -46,6 +47,16 @@ def list_infrastructure_targets(environment: str = "", kind: str = "") -> dict:
         return list_targets(environment=environment, kind=kind)
     except (OSError, ValueError) as exc:
         return {"error": str(exc), "targets": [], "secrets_included": False}
+
+@server.tool()
+async def probe_registered_target(target_id: str, timeout_seconds: int = 5) -> dict:
+    """Check reachability of a registered infrastructure endpoint."""
+    return await check_reachability(target_id, timeout_seconds)
+
+@server.tool()
+async def probe_registered_https(target_id: str) -> dict:
+    """Check HTTPS reachability for registered web endpoints."""
+    return await check_https_api(target_id)
 
 @server.tool()
 def list_ssh_keys() -> dict:
