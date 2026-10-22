@@ -4,7 +4,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir "mcp>=1.12,<2.0"
 WORKDIR /app
-COPY server.py registry.py providers.py hostinger_gateway.py hostinger_api.py browser_bridge.py ssh_binding.py /app/
+COPY server.py registry.py providers.py hostinger_gateway.py hostinger_api.py browser_bridge.py browser_extension_bridge.py ssh_binding.py /app/
 COPY infrastructure-registry.example.json /app/infrastructure-registry.json
 EXPOSE 8000
 CMD ["python", "/app/server.py"]
