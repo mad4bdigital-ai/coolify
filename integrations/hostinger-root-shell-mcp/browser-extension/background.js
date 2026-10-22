@@ -55,7 +55,7 @@ async function scan() {
           plan_expires:group?.plan_expires||null,group_evidence:group?.group_evidence||null};
         results.set(domain,site);
       }
-      const unresolved=[...new Set((document.body?.innerText?.match(allDomains)||[]).map(x=>x.toLowerCase()))]
+      const unresolved=[...new Set(((document.body?.innerText||"").replace(emailPattern," ").match(allDomains)||[]).map(x=>x.toLowerCase()))]
         .filter(x=>!excluded.has(x)&&!results.has(x)).slice(0,100);
       return {status:"SCOPED_CARD_CANDIDATES",sites:[...results.values()].slice(0,100),unresolved_domains:unresolved};
     }});
