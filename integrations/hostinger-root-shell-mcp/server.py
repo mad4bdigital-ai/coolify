@@ -10,6 +10,7 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from registry import list_targets
 from providers import check_reachability, check_https_api
+from hostinger_gateway import list_hostinger_accounts, plan_import
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -57,6 +58,16 @@ async def probe_registered_target(target_id: str, timeout_seconds: int = 5) -> d
 async def probe_registered_https(target_id: str) -> dict:
     """Check HTTPS reachability for registered web endpoints."""
     return await check_https_api(target_id)
+
+@server.tool()
+def list_hostinger_hpanel_accounts() -> dict:
+    """List enrolled hPanel account aliases and capability metadata, never tokens."""
+    return list_hostinger_accounts()
+
+@server.tool()
+def plan_hostinger_import(target_id: str, category: str = "websites") -> dict:
+    """Prepare a review-only import route without contacting or changing systems."""
+    return plan_import(target_id, category)
 
 @server.tool()
 def list_ssh_keys() -> dict:
