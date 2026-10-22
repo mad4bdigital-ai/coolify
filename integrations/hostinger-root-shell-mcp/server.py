@@ -8,6 +8,7 @@ import os
 import shlex
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
+from registry import list_targets
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -37,6 +38,14 @@ server = FastMCP(
     stateless_http=True,
     instructions="Root-level shell on the enrolled VPS. All commands run as root via SSH. Commands may change or delete production data. Never claim commands are read-only unless they are.",
 )
+
+@server.tool()
+def list_infrastructure_targets(environment: str = "", kind: str = "") -> dict:
+    """Discover approved inventory entries; no scanning or network access."""
+    try:
+        return list_targets(environment=environment, kind=kind)
+    except (OSError, ValueError) as exc:
+        return {"error": str(exc), "targets": [], "secrets_included": False}
 
 @server.tool()
 def list_ssh_keys() -> dict:
