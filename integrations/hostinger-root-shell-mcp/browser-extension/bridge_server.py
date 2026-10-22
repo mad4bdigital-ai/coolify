@@ -59,7 +59,7 @@ class H(BaseHTTPRequestHandler):
                 if not isinstance(sites,list):return self.respond(400,{"error":"INVALID_SITES"})
                 allowed=("domain","site_type","created_on","site_status","account_email","hosting_plan","plan_expires","evidence","group_evidence")
                 safe_sites=[{k:(str(x[k])[:255] if isinstance(x.get(k),str) else None) for k in allowed} for x in sites[:100] if isinstance(x,dict)]
-                jobs[key]["result"]={"ok":result.get("ok") is True,"status":str(result.get("status",""))[:60],"sites":safe_sites,
+                jobs[key]["result"]={"ok":result.get("ok") is True,"status":str(result.get("status",""))[:60],"sites":safe_sites,"unresolved_domains":[str(v)[:253] for v in (result.get("unresolved_domains") or [])[:100] if isinstance(v,str)],
                                      "domains":[str(v)[:253] for v in domains[:100]],"source":"hpanel-visible-dom"}
                 return self.respond(200,{"ok":True})
         self.respond(404,{"error":"NOT_FOUND"})
