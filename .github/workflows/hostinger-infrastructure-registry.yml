@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate Python syntax
-        run: python -m compileall -q registry.py providers.py hostinger_gateway.py server.py tests
+        run: python -m compileall -q registry.py providers.py hostinger_gateway.py hostinger_api.py server.py tests
       - name: Run dependency-free tests
         run: PYTHONPATH=. python -m unittest discover -s tests -v
       - name: Validate sample JSON and approved fields
