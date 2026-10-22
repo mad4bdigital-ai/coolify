@@ -1,7 +1,7 @@
 """MAD4B hPanel read-only browser worker. Never expose this service publicly."""
 import json
 import os
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright
 
@@ -27,9 +27,6 @@ def inspect(action):
                 return {"ok": True, "authenticated": False,
                         "status": "UNVERIFIED_SESSION", "account_alias": ""}
             return {"ok": False, "websites": [], "status": "SELECTOR_NOT_CERTIFIED"}
-            # Do not infer websites from unstructured text; selectors must be
-            # accepted against the real hPanel DOM before enabling extraction.
-            return {"ok": False, "websites": [], "status": "SELECTOR_NOT_CERTIFIED"}
         finally:
             context.close()
 
@@ -53,4 +50,4 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 if __name__ == "__main__":
-    ThreadingHTTPServer(("0.0.0.0", 13871), Handler).serve_forever()
+    HTTPServer(("0.0.0.0", 13871), Handler).serve_forever()
