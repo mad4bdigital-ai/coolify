@@ -4,7 +4,7 @@ import json
 import os
 import re
 
-DOMAIN = re.compile(r"(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,24}$")
+DOMAIN = re.compile(r"(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$")
 REMOTE = ("docker", "exec", "mad4b-secure-browser-mad4b-secure-browser-1",
           "python3", "/config/hpanel-reader-extension/bridge_request.py")
 
