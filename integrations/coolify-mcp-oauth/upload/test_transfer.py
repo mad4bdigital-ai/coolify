@@ -22,6 +22,14 @@ class TransferTests(unittest.TestCase):
         result=call(self.root,"upload_commit",{"transfer_id":grant["transfer_id"]},1024)
         self.assertEqual(result["sha256"],self.sha)
         self.assertEqual((self.root/(self.sha+".bin")).read_bytes(),self.data)
+    def test_upload_file_direct(self):
+        data={"content_base64":base64.b64encode(self.data).decode(),"sha256":self.sha,"owner":"person-a"}
+        result=call(self.root,"upload_file",data,1024)
+        self.assertEqual(result["bytes"],len(self.data))
+        self.assertEqual((self.root/(self.sha+".bin")).read_bytes(),self.data)
+    def test_upload_file_checksum_rejected(self):
+        with self.assertRaisesRegex(ValueError,"checksum_mismatch"):
+            call(self.root,"upload_file",{"content_base64":base64.b64encode(b"bad").decode(),"sha256":self.sha},1024)
     def test_owner_isolation(self):
         grant=call(self.root,"upload_begin",{"size":len(self.data),"sha256":self.sha,"owner":"person-a"},1024)
         with self.assertRaisesRegex(ValueError,"transfer_owner_mismatch"):
