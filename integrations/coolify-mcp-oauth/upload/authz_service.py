@@ -5,6 +5,7 @@ Authorization is granted only to stable subjects in an operator-managed allowlis
 """
 import base64
 import hmac
+import hashlib
 import ipaddress
 import json
 import os
@@ -19,6 +20,33 @@ INTROSPECT_CLIENT_SECRET=os.environ.get("UPLOAD_INTROSPECT_CLIENT_SECRET","")
 ALLOWED_SUBJECTS={s.strip() for s in os.environ.get("UPLOAD_ALLOWED_SUBJECTS","").split(",") if s.strip()}
 EXPECTED_ISSUER=os.environ.get("UPLOAD_INTROSPECT_ISSUER","")
 EXPECTED_AUDIENCE=os.environ.get("UPLOAD_INTROSPECT_AUDIENCE","")
+AUTHORIZATION_BACKEND=os.environ.get("UPLOAD_AUTHZ_BACKEND","introspection").strip().lower()
+ALLOWED_TOKEN_DIGESTS={value.strip().lower() for value in os.environ.get("UPLOAD_ALLOWED_TOKEN_SHA256","").split(",") if value.strip()}
+
+def authorize_oauth_fingerprint(bearer):
+    """Token-bound grant: verify via OAuth proxy AND operator-managed fingerprint."""
+    if not bearer.startswith("Bearer ") or len(bearer)>8192:return None
+    token=bearer[7:]
+    if not token or not ALLOWED_TOKEN_DIGESTS:return None
+    digest=hashlib.sha256(token.encode()).hexdigest()
+    if not any(len(candidate)==64 and hmac.compare_digest(digest,candidate) for candidate in ALLOWED_TOKEN_DIGESTS):return None
+    payload=json.dumps({"jsonrpc":"2.0","id":"upload-authz","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"upload-authz","version":"1"}}}).encode()
+    request=urllib.request.Request("http://coolify-mcp-oauth:8080/mcp",data=payload,method="POST",headers={"Authorization":bearer,"Content-Type":"application/json","Accept":"application/json, text/event-stream","MCP-Protocol-Version":"2025-11-25"})
+    try:
+        with urllib.request.urlopen(request,timeout=5) as response:
+            if response.status!=200:return None
+            body=response.read(16385)
+            if len(body)>16384:return None
+            content_type=response.headers.get("Content-Type","")
+            if "text/event-stream" in content_type:
+                values=[json.loads(line[6:]) for line in body.decode("utf-8","replace").splitlines() if line.startswith("data: ")]
+                if not any(x.get("id")=="upload-authz" and isinstance(x.get("result"),dict) and x["result"].get("serverInfo") for x in values):return None
+            else:
+                result=json.loads(body)
+                if result.get("id")!="upload-authz" or not isinstance(result.get("result"),dict) or not result["result"].get("serverInfo"):return None
+    except (OSError,ValueError,urllib.error.URLError):
+        return None
+    return "oauth-token:"+digest
 
 def authorize_token(bearer):
     if not bearer.startswith("Bearer ") or len(bearer)>8192:return None
@@ -50,6 +78,9 @@ def authorize_token(bearer):
     return sub
 
 def readiness():
+    if AUTHORIZATION_BACKEND=="oauth_fingerprint":
+        valid=bool(ALLOWED_TOKEN_DIGESTS) and all(len(x)==64 and all(c in "0123456789abcdef" for c in x) for x in ALLOWED_TOKEN_DIGESTS)
+        return {"ready":valid,"missing":[] if valid else ["allowed_token_sha256"]}
     fields={"introspection_url":bool(INTROSPECT_URL),"client_id":bool(INTROSPECT_CLIENT_ID),"client_secret":bool(INTROSPECT_CLIENT_SECRET),"issuer":bool(EXPECTED_ISSUER),"audience":bool(EXPECTED_AUDIENCE),"allowed_subjects":bool(ALLOWED_SUBJECTS)}
     return {"ready":all(fields.values()),"missing":[key for key,valid in fields.items() if not valid]}
 
@@ -75,7 +106,7 @@ class Handler(BaseHTTPRequestHandler):
         try:body=json.loads(self.rfile.read(int(size)))
         except (ValueError,UnicodeDecodeError):return self.reply(400,{"error":"invalid_request"})
         if body!={"permission":"files:upload"}:return self.reply(403,{"allowed":False})
-        subject=authorize_token(self.headers.get("Authorization",""))
+        subject=(authorize_oauth_fingerprint(self.headers.get("Authorization","")) if AUTHORIZATION_BACKEND=="oauth_fingerprint" else authorize_token(self.headers.get("Authorization","")) if AUTHORIZATION_BACKEND=="introspection" else None)
         if not subject:return self.reply(403,{"allowed":False})
         return self.reply(200,{"allowed":True,"permission":"files:upload","sub":subject})
 if __name__=="__main__":
