@@ -83,6 +83,8 @@ services:
       dockerfile: Authz.Dockerfile
     restart: unless-stopped
     environment:
+      UPLOAD_AUTHZ_BACKEND: "oauth_fingerprint"
+      UPLOAD_ALLOWED_TOKEN_SHA256: "${UPLOAD_ALLOWED_TOKEN_SHA256:-}"
       UPLOAD_INTROSPECT_URL: "${UPLOAD_INTROSPECT_URL:-}"
       UPLOAD_INTROSPECT_CLIENT_ID: "${UPLOAD_INTROSPECT_CLIENT_ID:-}"
       UPLOAD_INTROSPECT_CLIENT_SECRET: "${UPLOAD_INTROSPECT_CLIENT_SECRET:-}"
