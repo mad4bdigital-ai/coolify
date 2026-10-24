@@ -15,3 +15,19 @@ Current OAuth verification is delegated to the existing proxy with `initialize`,
 Do not equate automatic branch redeploy with automatic registration of tools in ChatGPT. Also do not interpret the presence of `file_uri` as permission or ability to dereference a private ChatGPT attachment: there must be a supported host-provided file transport.
 
 The archive JetWooBuilder 2.3.5 has known expected SHA-256 `caeaa0c464c55e77f6acfc225288909da1fa470771412cd89e80b1c2f82ac219`; no claim of delivery to VPS until independent hash readback on VPS.
+
+## Explicit outcome semantics and hardening (24 October 2026)
+
+Treat the following as distinct, independently verified states:
+
+- `transfer_started`: an allocation and transfer ID only; zero bytes may have arrived.
+- `bytes_received`: status offset confirmed; partial bytes are **not** an uploaded artifact.
+- `quarantined`: commit returned after validating full length and SHA-256 on the upload service; **not** delivered to VPS.
+- `stored_on_vps`: `upload_server_file` copied the verified quarantine artifact to the fixed VPS staging directory. Read back SHA-256 on the target to establish independent confirmation.
+- `installed_in_lab`: separate, explicit WordPress Lab operation and plugin-version readback; none of the upload tools installs or activates software.
+
+`upload_attachment` is a legacy name for Base64 content ingestion; it does not dereference ChatGPT attachment IDs, `file_uri`, local paths, or conversation files. A native attachment workflow requires an explicitly authorized runtime-provided byte bridge or binary HTTPS upload. Never pass arbitrary private ChatGPT URLs to `upload_from_url`.
+
+**Authorization:** Only `UPLOAD_AUTHORIZATION_MODE=strict` with an explicit verified `files:upload` permission and principal is allowed. A successful OAuth login/initialize alone cannot grant upload rights; `oauth_login` and unknown modes deny. Revise any staging configuration relying on the previous login-only mode before deployment.
+
+**Claims:** A successful PR check or local unit test does not certify public HTTPS routing, attachment-byte access from ChatGPT, production readiness, full malware safety, SFTP arrival, or WordPress installation. In reports, include the verified state, artifact digest, target, and evidence; use `not_verified` for missing stages.
