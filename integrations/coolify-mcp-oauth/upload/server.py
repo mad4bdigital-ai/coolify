@@ -15,6 +15,7 @@ import urllib.error
 import transfer
 import url_import
 import authorization
+import server_storage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_BYTES=int(os.environ.get("UPLOAD_MAX_BYTES",str(32*1024*1024)))
@@ -75,6 +76,7 @@ class Handler(BaseHTTPRequestHandler):
                 for name in transfer.OPS:
                     props={"content_base64":{"type":"string"},"sha256":{"type":"string"}} if name=="upload_file" else ({"size":{"type":"integer"},"sha256":{"type":"string"}} if name=="upload_begin" else ({"transfer_id":{"type":"string"},"offset":{"type":"integer"},"base64":{"type":"string"}} if name=="upload_chunk" else {"transfer_id":{"type":"string"}}))
                     tools.append({"name":name,"description":"Authorized resumable binary transfer; quarantines bytes, never executes files","inputSchema":{"type":"object","properties":props,"additionalProperties":False}})
+                tools.append({"name":"upload_server_file","description":"Copy a verified quarantine file into the fixed VPS upload directory; requires authenticated OAuth","inputSchema":{"type":"object","properties":{"sha256":{"type":"string"},"filename":{"type":"string"}},"required":["sha256","filename"],"additionalProperties":False}})
                 tools.append({"name":"upload_from_url","description":"Import allowlisted HTTPS download URL to quarantine after SHA256 verification","inputSchema":{"type":"object","properties":{"url":{"type":"string"},"sha256":{"type":"string"}},"required":["url","sha256"]}})
                 return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"tools":tools}})
             if method!="tools/call":return self.reply(400,{"error":"unsupported_mcp_method"})
@@ -91,7 +93,9 @@ class Handler(BaseHTTPRequestHandler):
             # Transfer ownership is scoped to the validated OAuth bearer; caller cannot override.
             inputs=dict(inputs)
             inputs["owner"]=principal
-            if operation=="upload_from_url":
+            if operation=="upload_server_file":
+                result=server_storage.promote(TARGET,Path("/data/server-quarantine"),inputs.get("sha256"),inputs.get("filename"),MAX_BYTES)
+            elif operation=="upload_from_url":
                 hosts={h.strip().lower() for h in os.environ.get("UPLOAD_URL_ALLOWED_HOSTS","").split(",") if h.strip()}
                 result=url_import.import_url(TARGET,inputs.get("url",""),inputs.get("sha256",""),MAX_BYTES,hosts)
             else:
@@ -102,6 +106,14 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=="/mcp-upload":return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"isError":True,"content":[{"type":"text","text":str(exc)}]}})
             return self.reply(422,{"error":str(exc)})
     def do_POST(self):
+        if self.path=="/v1/server-files":
+            if self.upload_subject() is None:return self.reply(403,{"error":"upload_permission_required"})
+            data=self.body_json()
+            if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
+            try:
+                result=server_storage.promote(TARGET,Path("/data/server-quarantine"),data.get("sha256"),data.get("filename"),MAX_BYTES)
+                return self.reply(201,result)
+            except (ValueError,OSError) as exc:return self.reply(422,{"error":str(exc)})
         if self.path=="/v1/import-url":
             if self.upload_subject() is None:return self.reply(403,{"error":"upload_permission_required"})
             data=self.body_json()
