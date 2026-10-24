@@ -50,7 +50,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.headers.get("Authorization","").removeprefix("Bearer ")
     def upload_subject(self):
         # Authentication alone is insufficient: require verified files:upload permission.
-        return authorization.authorize(self.headers.get("Authorization",""))
+        return authorization.authorize_upload(self.headers.get("Authorization",""))
 
     def body_json(self,limit=8192):
         length=self.headers.get("Content-Length","")
