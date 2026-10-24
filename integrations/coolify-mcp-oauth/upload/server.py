@@ -75,7 +75,8 @@ class Handler(BaseHTTPRequestHandler):
     def transfer_request(self):
         if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
         principal=hashlib.sha256(self.headers.get("Authorization","").encode()).hexdigest()
-        data=self.body_json(limit=MAX_BYTES*2+8192 if self.path=="/mcp-upload" else 8192)
+        body_limit=(MAX_BYTES*2+8192 if self.path=="/mcp-upload" else (transfer.CHUNK_MAX*2+8192 if self.path=="/v1/transfers/chunk" else 8192))
+        data=self.body_json(limit=body_limit)
         if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
         if self.path=="/mcp-upload":
             mid=data.get("id")
