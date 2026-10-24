@@ -34,6 +34,17 @@ services:
       - ALL
 
   public-file-upload:
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.mad4b-upload-api.rule=Host(`coolify-mcp.infra.mad4b.com`) && PathPrefix(`/upload/v1/`)'
+      - 'traefik.http.routers.mad4b-upload-api.entrypoints=https'
+      - 'traefik.http.routers.mad4b-upload-api.priority=150'
+      - 'traefik.http.routers.mad4b-upload-api.tls=true'
+      - 'traefik.http.routers.mad4b-upload-api.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-upload-api.middlewares=mad4b-upload-api-strip'
+      - 'traefik.http.middlewares.mad4b-upload-api-strip.stripprefix.prefixes=/upload'
+      - 'traefik.http.services.mad4b-upload-api.loadbalancer.server.port=8080'
+      - 'traefik.http.routers.mad4b-upload-api.service=mad4b-upload-api'
     build:
       context: ./upload
       dockerfile: Dockerfile
@@ -67,6 +78,17 @@ services:
       - /tmp:rw,nosuid,nodev,noexec,size=16m
 
   mcp-provider-registry:
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.mad4b-registry.rule=Host(`coolify-mcp.infra.mad4b.com`) && Path(`/upload/mcp`)'
+      - 'traefik.http.routers.mad4b-registry.entrypoints=https'
+      - 'traefik.http.routers.mad4b-registry.priority=160'
+      - 'traefik.http.routers.mad4b-registry.tls=true'
+      - 'traefik.http.routers.mad4b-registry.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-registry.middlewares=mad4b-registry-strip'
+      - 'traefik.http.middlewares.mad4b-registry-strip.stripprefix.prefixes=/upload'
+      - 'traefik.http.services.mad4b-registry.loadbalancer.server.port=8080'
+      - 'traefik.http.routers.mad4b-registry.service=mad4b-registry'
     build:
       context: ./registry
       dockerfile: Dockerfile
