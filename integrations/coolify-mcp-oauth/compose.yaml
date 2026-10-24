@@ -78,6 +78,9 @@ services:
       - /tmp:rw,nosuid,nodev,noexec,size=16m
 
   mcp-provider-registry:
+    environment:
+      COOLIFY_SOURCE_MCP_URL: "https://coolify.infra.mad4b.com/mcp"
+      COOLIFY_SOURCE_AUTHORIZATION: "${UPSTREAM_AUTHORIZATION_HEADER:?Existing Coolify bearer required}"
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.mad4b-registry.rule=Host(`coolify-mcp.infra.mad4b.com`) && Path(`/upload/mcp`)'
