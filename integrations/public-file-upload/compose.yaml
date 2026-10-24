@@ -1,0 +1,30 @@
+# Public HTTPS file receiver. Separate application from Coolify OAuth MCP.
+services:
+  public-file-upload:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      UPLOAD_ADMIN_TOKEN: "${UPLOAD_ADMIN_TOKEN:?Unique admin token required}"
+      UPLOAD_SIGNING_SECRET: "${UPLOAD_SIGNING_SECRET:?Unique signing secret required}"
+      UPLOAD_MAX_BYTES: "33554432"
+      UPLOAD_QUARANTINE: /data/quarantine
+    volumes:
+      - upload-quarantine:/data/quarantine
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
+volumes:
+  upload-quarantine: {}
