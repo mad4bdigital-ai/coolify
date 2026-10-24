@@ -12,6 +12,7 @@ import tempfile
 import time
 import urllib.request
 import urllib.error
+import transfer
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_BYTES=int(os.environ.get("UPLOAD_MAX_BYTES",str(32*1024*1024)))
@@ -70,7 +71,41 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError,UnicodeDecodeError):return None
     def do_GET(self):
         return self.reply(200,{"status":"ok"}) if self.path=="/healthz" else self.reply(404,{"error":"not_found"})
+    def transfer_request(self):
+        if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
+        data=self.body_json()
+        if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
+        if self.path=="/mcp-upload":
+            mid=data.get("id")
+            method=data.get("method")
+            if method=="initialize":
+                return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"mad4b-file-transfer","version":"0.1.0"}}})
+            if method=="tools/list":
+                tools=[]
+                for name in transfer.OPS:
+                    props={"size":{"type":"integer"},"sha256":{"type":"string"}} if name=="upload_begin" else ({"transfer_id":{"type":"string"},"offset":{"type":"integer"},"base64":{"type":"string"}} if name=="upload_chunk" else {"transfer_id":{"type":"string"}})
+                    tools.append({"name":name,"description":"Authorized resumable binary transfer; quarantines bytes, never executes files","inputSchema":{"type":"object","properties":props,"additionalProperties":False}})
+                return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"tools":tools}})
+            if method!="tools/call":return self.reply(400,{"error":"unsupported_mcp_method"})
+            args=data.get("params") or {}
+            operation=args.get("name")
+            inputs=args.get("arguments") or {}
+        else:
+            operation=self.path.rsplit("/",1)[-1]
+            mapping={"begin":"upload_begin","chunk":"upload_chunk","status":"upload_status","commit":"upload_commit"}
+            operation=mapping.get(operation)
+            inputs=data
+            mid=None
+        try:
+            result=transfer.call(TARGET,operation,inputs,MAX_BYTES)
+            if self.path=="/mcp-upload":return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"content":[{"type":"text","text":json.dumps(result)}]}})
+            return self.reply(200,result)
+        except (ValueError,KeyError,OSError) as exc:
+            if self.path=="/mcp-upload":return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"isError":True,"content":[{"type":"text","text":str(exc)}]}})
+            return self.reply(422,{"error":str(exc)})
     def do_POST(self):
+        if self.path=="/mcp-upload" or self.path in ("/v1/transfers/begin","/v1/transfers/chunk","/v1/transfers/status","/v1/transfers/commit"):
+            return self.transfer_request()
         if self.path=="/v1/grants":
             if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
             data=self.body_json()
