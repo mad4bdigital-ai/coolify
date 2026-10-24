@@ -22,7 +22,13 @@ def discover(token):
     tools=[];routes={}
     for provider,config in PROVIDERS.items():
         effective_token=config.get("authorization",token)
-        answer=call_provider(config["url"],{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
+        try:
+            answer=call_provider(config["url"],{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
+        except urllib.error.HTTPError as exc:
+            # An unavailable optional provider must not hide the core Coolify catalog.
+            # A denied Upload bearer must never be promoted into Upload authority.
+            if provider=="upload" and exc.code in (401,403):continue
+            raise
         for tool in answer.get("result",{}).get("tools",[]):
             name=tool.get("name")
             if not isinstance(name,str) or not name or len(name)>96:raise ValueError("invalid_tool_name")
