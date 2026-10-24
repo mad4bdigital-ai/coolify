@@ -49,6 +49,10 @@ def authorize_token(bearer):
     if not isinstance(sub,str) or sub not in ALLOWED_SUBJECTS:return None
     return sub
 
+def readiness():
+    fields={"introspection_url":bool(INTROSPECT_URL),"client_id":bool(INTROSPECT_CLIENT_ID),"client_secret":bool(INTROSPECT_CLIENT_SECRET),"issuer":bool(EXPECTED_ISSUER),"audience":bool(EXPECTED_AUDIENCE),"allowed_subjects":bool(ALLOWED_SUBJECTS)}
+    return {"ready":all(fields.values()),"missing":[key for key,valid in fields.items() if not valid]}
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,fmt,*args):pass
     def reply(self,status,obj):
@@ -59,7 +63,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length",str(len(blob)))
         self.end_headers();self.wfile.write(blob)
     def do_GET(self):
-        if self.path=="/healthz":return self.reply(200,{"status":"ok","authorization_configured":bool(INTROSPECT_URL and ALLOWED_SUBJECTS)})
+        if self.path=="/healthz":return self.reply(200,{"status":"ok","authorization_configured":readiness()["ready"]})
+        if self.path=="/readyz":
+            report=readiness()
+            return self.reply(200 if report["ready"] else 503,report)
         self.reply(404,{"error":"not_found"})
     def do_POST(self):
         if self.path!="/v1/authorize":return self.reply(404,{"error":"not_found"})
