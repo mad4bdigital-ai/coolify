@@ -87,9 +87,17 @@ class Handler(BaseHTTPRequestHandler):
         identity=authorize_identity(auth)
         if identity is None:return self.respond(401,{"error":"invalid_authorization"})
         length=self.headers.get("Content-Length","")
-        if not length.isdecimal() or int(length)>1024*1024:return self.respond(413,{"error":"request_too_large"})
+        if not length.isdecimal():return self.respond(413,{"error":"request_too_large"})
+        size=int(length)
+        # File bytes are base64-encoded inside MCP JSON; constrain the larger
+        # payload to a verified, explicitly named attachment upload only.
+        large_upload_limit=45*1024*1024
+        if size>large_upload_limit:return self.respond(413,{"error":"request_too_large"})
         try:
-            request=json.loads(self.rfile.read(int(length)));method=request.get("method");identifier=request.get("id")
+            request=json.loads(self.rfile.read(size));method=request.get("method");identifier=request.get("id")
+            name=(request.get("params") or {}).get("name") if isinstance(request,dict) else None
+            if size>1024*1024 and not (method=="tools/call" and name in ("upload__upload_attachment","upload__upload_file")):
+                return self.respond(413,{"error":"request_too_large"})
             if method=="initialize":return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"mad4b-provider-registry","version":"0.1.0"}}})
             tools,routes=discover(auth,identity)
             if method=="tools/list":return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"tools":tools}})
