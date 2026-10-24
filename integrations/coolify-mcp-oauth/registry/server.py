@@ -54,6 +54,9 @@ class Handler(BaseHTTPRequestHandler):
             url,name=routes[qualified]
             result=call_provider(url,{"jsonrpc":"2.0","id":identifier,"method":"tools/call","params":{"name":name,"arguments":p.get("arguments") or {}}},auth)
             return self.respond(200,result)
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401,403):return self.respond(exc.code,{"error":"provider_authorization_failed"})
+            return self.respond(503,{"error":"provider_unavailable"})
         except (ValueError,KeyError,OSError,urllib.error.URLError):
             return self.respond(503,{"error":"provider_unavailable"})
 if __name__=="__main__":ThreadingHTTPServer(("0.0.0.0",8080),Handler).serve_forever()
