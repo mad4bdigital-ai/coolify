@@ -10,11 +10,13 @@ import re
 import secrets
 import tempfile
 import time
+import urllib.request
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_BYTES=int(os.environ.get("UPLOAD_MAX_BYTES",str(32*1024*1024)))
 TARGET=Path(os.environ.get("UPLOAD_QUARANTINE","/data/quarantine")).resolve()
-ADMIN=os.environ.get("UPLOAD_ADMIN_TOKEN","")
+OAUTH_VERIFY_URL=os.environ.get("UPLOAD_OAUTH_VERIFY_URL","http://coolify-mcp-oauth:8080/mcp")
 SIGNING=os.environ.get("UPLOAD_SIGNING_SECRET","")
 HEX=re.compile(r"^[a-f0-9]{64}$")
 def enc(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
@@ -43,8 +45,24 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers();self.wfile.write(blob)
     def auth(self):
         return self.headers.get("Authorization","").removeprefix("Bearer ")
-    def admin(self):
-        return bool(ADMIN) and hmac.compare_digest(self.headers.get("Authorization",""),"Bearer "+ADMIN)
+    def oauth_authorized(self):
+        bearer=self.headers.get("Authorization","")
+        if not bearer.startswith("Bearer ") or len(bearer)>8192:return False
+        payload=json.dumps({"jsonrpc":"2.0","id":"upload-auth","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"upload-oauth-authcheck","version":"1"}}}).encode()
+        req=urllib.request.Request(OAUTH_VERIFY_URL,data=payload,method="POST",headers={"Authorization":bearer,"Content-Type":"application/json","Accept":"application/json, text/event-stream","MCP-Protocol-Version":"2025-11-25"})
+        try:
+            with urllib.request.urlopen(req,timeout=5) as resp:
+                if resp.status!=200:return False
+                raw=resp.read(16384)
+                if "text/event-stream" in resp.headers.get("Content-Type",""):
+                    for line in raw.decode("utf-8","replace").splitlines():
+                        if line.startswith("data: "):
+                            data=json.loads(line[6:])
+                            if data.get("id")=="upload-auth" and isinstance(data.get("result"),dict):return True
+                    return False
+                data=json.loads(raw)
+                return data.get("id")=="upload-auth" and isinstance(data.get("result"),dict)
+        except (urllib.error.URLError,ValueError,TimeoutError,OSError):return False
     def body_json(self):
         length=self.headers.get("Content-Length","")
         if not length.isdecimal() or int(length)>8192:return None
@@ -54,7 +72,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(200,{"status":"ok"}) if self.path=="/healthz" else self.reply(404,{"error":"not_found"})
     def do_POST(self):
         if self.path=="/v1/grants":
-            if not self.admin():return self.reply(401,{"error":"admin_required"})
+            if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
             data=self.body_json()
             if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
             # No fixed maximum lifetime. Each grant has its own requested positive expiry.
@@ -68,7 +86,7 @@ class Handler(BaseHTTPRequestHandler):
             grant={"jti":secrets.token_hex(16),"scope":"upload","exp":exp,"sha256":sha,"max_bytes":limit}
             return self.reply(201,{"upload_token":mint(grant),"expires_at":exp,"grant_id":grant["jti"]})
         if self.path=="/v1/grants/revoke":
-            if not self.admin():return self.reply(401,{"error":"admin_required"})
+            if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
             data=self.body_json()
             jti=data.get("grant_id") if isinstance(data,dict) else None
             if not isinstance(jti,str) or not re.fullmatch("[a-f0-9]{32}",jti):return self.reply(422,{"error":"invalid_grant_id"})
@@ -102,6 +120,6 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             if os.path.exists(tmp):os.unlink(tmp)
 if __name__=="__main__":
-    if min(len(ADMIN),len(SIGNING))<32:raise SystemExit("Set distinct UPLOAD_ADMIN_TOKEN and UPLOAD_SIGNING_SECRET (32+ characters each)")
+    if len(SIGNING)<32:raise SystemExit("UPLOAD_SIGNING_SECRET must have at least 32 characters")
     TARGET.mkdir(mode=0o700,parents=True,exist_ok=True)
     ThreadingHTTPServer(("0.0.0.0",8080),Handler).serve_forever()
