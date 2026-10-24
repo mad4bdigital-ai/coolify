@@ -18,18 +18,19 @@ def begin(root,payload,max_bytes):
     with open(part,"xb") as f:os.fchmod(f.fileno(),0o600)
     with open(meta,"x") as f:
         os.fchmod(f.fileno(),0o600)
-        json.dump({"size":size,"sha256":digest,"offset":0,"created":int(time.time())},f)
+        json.dump({"size":size,"sha256":digest,"offset":0,"created":int(time.time()),"owner":payload.get("owner")},f)
     return {"transfer_id":ident,"offset":0,"max_chunk_bytes":CHUNK_MAX}
-def inspect(root,ident):
+def inspect(root,ident,owner=None):
     meta,part=paths(root,ident)
     if not meta.exists() or not part.exists():raise ValueError("unknown_transfer")
     data=json.loads(meta.read_text())
+    if data.get("owner")!=owner:raise ValueError("transfer_owner_mismatch")
     if time.time()-data["created"]>86400:raise ValueError("transfer_expired")
     real=part.stat().st_size
     if real!=data["offset"]:raise ValueError("transfer_state_conflict")
     return data,meta,part
 def append(root,payload):
-    ident=payload.get("transfer_id");data,meta,part=inspect(root,ident)
+    ident=payload.get("transfer_id");data,meta,part=inspect(root,ident,payload.get("owner"))
     offset=payload.get("offset")
     if type(offset)!=int or offset!=data["offset"]:raise ValueError("offset_conflict")
     encoded=payload.get("base64")
@@ -47,10 +48,10 @@ def append(root,payload):
     tmp.write_text(json.dumps(data));os.chmod(tmp,0o600);os.replace(tmp,meta)
     return {"transfer_id":ident,"offset":data["offset"],"size":data["size"]}
 def status(root,payload):
-    data,_,_=inspect(root,payload.get("transfer_id"))
+    data,_,_=inspect(root,payload.get("transfer_id"),payload.get("owner"))
     return {"offset":data["offset"],"size":data["size"],"sha256":data["sha256"]}
 def finish(root,payload):
-    ident=payload.get("transfer_id");data,meta,part=inspect(root,ident)
+    ident=payload.get("transfer_id");data,meta,part=inspect(root,ident,payload.get("owner"))
     if data["offset"]!=data["size"]:raise ValueError("incomplete_transfer")
     h=hashlib.sha256()
     with open(part,"rb") as f:
