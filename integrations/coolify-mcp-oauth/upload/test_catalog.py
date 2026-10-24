@@ -18,6 +18,17 @@ class CatalogTests(unittest.TestCase):
         server=descriptors["upload_server_file"]
         self.assertIn("Requires prior successful upload",server["description"])
         self.assertIn("does NOT install",server["description"])
+    def test_https_tool_guides_without_inventing_attachment_urls(self):
+        descriptors={d["name"]:d for d in catalog.list_tools()}
+        tool=descriptors["upload_from_url"]
+        description=tool["description"]
+        self.assertIn("obtain an actual downloadable HTTPS URL",description)
+        self.assertIn("NEVER invent or reconstruct a URL",description)
+        self.assertIn("server allowlist",description)
+        self.assertIn("sandbox:/",description)
+        self.assertIn("not installed",description)
+        self.assertEqual(tool["inputSchema"]["required"],["url","sha256"])
+        self.assertIn("do not guess",tool["inputSchema"]["properties"]["sha256"]["description"])
     def test_unknown_rejected(self):
         self.assertFalse(catalog.supported("../unsafe"))
 if __name__=="__main__":unittest.main()
