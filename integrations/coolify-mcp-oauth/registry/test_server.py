@@ -4,6 +4,29 @@ from unittest.mock import patch
 import server
 
 class RegistryTests(unittest.TestCase):
+    def test_modern_server_discover(self):
+        from io import BytesIO
+        import json
+        req=server.Handler.__new__(server.Handler)
+        raw=json.dumps({"jsonrpc":"2.0","id":"openai-mcp-discover","method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}).encode()
+        req.path="/mcp";req.headers={"Authorization":"Bearer approved","Content-Length":str(len(raw))};req.rfile=BytesIO(raw)
+        results=[];req.respond=lambda code,body:results.append((code,body))
+        with patch.object(server,"authorize_identity",return_value="coolify"):
+            req.do_POST()
+        self.assertEqual(results[0][0],200)
+        self.assertIn("2026-07-28",results[0][1]["result"]["supportedVersions"])
+        self.assertEqual(results[0][1]["result"]["resultType"],"complete")
+    def test_initialized_notification_is_accepted(self):
+        from io import BytesIO
+        req=server.Handler.__new__(server.Handler)
+        raw=b'{"jsonrpc":"2.0","method":"notifications/initialized"}'
+        req.path="/mcp";req.headers={"Authorization":"Bearer approved","Content-Length":str(len(raw))};req.rfile=BytesIO(raw)
+        status=[];req.send_response=lambda code:status.append(code)
+        req.send_header=lambda *args:None
+        req.end_headers=lambda:None
+        with patch.object(server,"authorize_identity",return_value="coolify"):
+            req.do_POST()
+        self.assertEqual(status,[202])
     def test_namespaced_discovery(self):
         def fake(url,req,token):
             return {"result":{"tools":[{"name":"upload_server_file","inputSchema":{"type":"object"}}]}}
