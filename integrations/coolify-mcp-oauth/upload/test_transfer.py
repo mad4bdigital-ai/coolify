@@ -22,6 +22,12 @@ class TransferTests(unittest.TestCase):
         result=call(self.root,"upload_commit",{"transfer_id":grant["transfer_id"]},1024)
         self.assertEqual(result["sha256"],self.sha)
         self.assertEqual((self.root/(self.sha+".bin")).read_bytes(),self.data)
+    def test_owner_isolation(self):
+        grant=call(self.root,"upload_begin",{"size":len(self.data),"sha256":self.sha,"owner":"person-a"},1024)
+        with self.assertRaisesRegex(ValueError,"transfer_owner_mismatch"):
+            call(self.root,"upload_status",{"transfer_id":grant["transfer_id"],"owner":"person-b"},1024)
+        with self.assertRaisesRegex(ValueError,"transfer_owner_mismatch"):
+            call(self.root,"upload_chunk",{"transfer_id":grant["transfer_id"],"offset":0,"base64":"YQ==","owner":"person-b"},1024)
     def test_wrong_offset_rejected(self):
         grant=self.begin()
         with self.assertRaisesRegex(ValueError,"offset_conflict"):
