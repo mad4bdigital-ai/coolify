@@ -13,7 +13,7 @@ services:
       OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:?Google OAuth web client ID required}"
       OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:?Google OAuth web client secret required}"
       PROXY_BASE_URL: "${PROXY_BASE_URL:?Dedicated HTTPS adapter URL required}"
-      UPSTREAM_MCP_URL: "https://coolify.infra.mad4b.com/mcp"
+      UPSTREAM_MCP_URL: "http://coolify:8080/mcp"
       UPSTREAM_AUTHORIZATION_HEADER: "${UPSTREAM_AUTHORIZATION_HEADER:?Read-only Coolify Bearer required}"
       TOKEN_SIGNING_SECRET: "${TOKEN_SIGNING_SECRET:?Unique strong signing key required}"
       REDIS_URL: "redis://oauth-redis:6379/0"
@@ -28,6 +28,7 @@ services:
     networks:
       - default
       - oauth-state
+      - coolify-internal
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -108,6 +109,12 @@ services:
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.mad4b-registry.rule=Host(`coolify-mcp.infra.mad4b.com`) && Path(`/upload/mcp`)'
+      - 'traefik.http.routers.mad4b-primary-mcp.rule=Host(`coolify.infra.mad4b.com`) && Path(`/mcp`)'
+      - 'traefik.http.routers.mad4b-primary-mcp.entrypoints=https'
+      - 'traefik.http.routers.mad4b-primary-mcp.priority=250'
+      - 'traefik.http.routers.mad4b-primary-mcp.tls=true'
+      - 'traefik.http.routers.mad4b-primary-mcp.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-primary-mcp.service=mad4b-registry'
       - 'traefik.http.routers.mad4b-registry.entrypoints=https'
       - 'traefik.http.routers.mad4b-registry.priority=160'
       - 'traefik.http.routers.mad4b-registry.tls=true'
