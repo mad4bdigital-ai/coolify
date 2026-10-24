@@ -26,7 +26,7 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("NEVER invent or reconstruct a URL",description)
         self.assertIn("server allowlist",description)
         self.assertIn("sandbox:/",description)
-        self.assertIn("not installed",description)
+        self.assertIn("nor installed",description)
         self.assertEqual(tool["inputSchema"]["required"],["url","sha256"])
         self.assertIn("do not guess",tool["inputSchema"]["properties"]["sha256"]["description"])
     def test_unknown_rejected(self):
