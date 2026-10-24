@@ -16,8 +16,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      UPLOAD_ADMIN_TOKEN: "${UPLOAD_ADMIN_TOKEN:-}"
       UPLOAD_SIGNING_SECRET: "${UPLOAD_SIGNING_SECRET:-}"
+      UPLOAD_OAUTH_VERIFY_URL: "http://coolify-mcp-oauth:8080/mcp"
       UPLOAD_MAX_BYTES: "33554432"
       UPLOAD_QUARANTINE: /data/quarantine
     volumes:
