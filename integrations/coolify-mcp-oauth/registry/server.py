@@ -46,13 +46,16 @@ def authorize_identity(bearer):
 def discover(token,identity=None):
     tools=[];routes={}
     for provider,config in PROVIDERS.items():
-        if identity=="upload_oauth" and provider=="coolify":
-            continue
         if identity=="coolify" and provider=="upload":
             continue
-        effective_token=token if identity=="coolify" and provider=="coolify" else config.get("authorization",token)
+        if provider=="coolify" and identity=="upload_oauth":
+            effective_url="http://coolify-mcp-oauth:8080/mcp"
+            effective_token=token
+        else:
+            effective_url=config["url"]
+            effective_token=token if identity=="coolify" and provider=="coolify" else config.get("authorization",token)
         try:
-            answer=call_provider(config["url"],{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
+            answer=call_provider(effective_url,{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
         except urllib.error.HTTPError as exc:
             # An unavailable optional provider must not hide the core Coolify catalog.
             # A denied Upload bearer must never be promoted into Upload authority.
@@ -64,7 +67,7 @@ def discover(token,identity=None):
             qualified=config["prefix"]+name
             if qualified in routes:raise ValueError("tool_collision")
             item=dict(tool);item["name"]=qualified
-            tools.append(item);routes[qualified]=(config["url"],name,effective_token)
+            tools.append(item);routes[qualified]=(effective_url,name,effective_token)
     return tools,routes
 
 class Handler(BaseHTTPRequestHandler):
