@@ -79,7 +79,7 @@ services:
 
   mcp-provider-registry:
     environment:
-      COOLIFY_SOURCE_MCP_URL: "https://coolify.infra.mad4b.com/mcp"
+      COOLIFY_SOURCE_MCP_URL: "http://coolify:8080/mcp"
       COOLIFY_SOURCE_AUTHORIZATION: "${UPSTREAM_AUTHORIZATION_HEADER:?Existing Coolify bearer required}"
     labels:
       - 'traefik.enable=true'
@@ -100,6 +100,7 @@ services:
       - "8080"
     networks:
       - default
+      - coolify-internal
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=3)"]
       interval: 30s
@@ -131,6 +132,9 @@ services:
       - ALL
 
 networks:
+  coolify-internal:
+    external: true
+    name: coolify
   oauth-state:
     internal: true
 volumes:
