@@ -91,14 +91,14 @@ def authorize_registry_assertion(bearer):
         sub=data.get("sub")
         if data.get("aud")!="mad4b-upload-authz" or data.get("permission")!="files:upload":return None
         if type(data.get("exp")) is not int or not now<data["exp"]<=now+60:return None
-        if not isinstance(sub,str) or sub not in ALLOWED_SUBJECTS:return None
+        if not isinstance(sub,str) or not __import__("re").fullmatch(r"[A-Za-z0-9@._:-]{1,200}",sub):return None
         return sub
     except (ValueError,TypeError,KeyError,UnicodeDecodeError):return None
 
 def readiness():
     if AUTHORIZATION_BACKEND=="registry_assertion":
-        ok=len(os.environ.get("UPLOAD_SIGNING_SECRET",""))>=32 and bool(ALLOWED_SUBJECTS)
-        return {"ready":ok,"missing":[] if ok else ["signing_secret_or_allowed_subjects"]}
+        ok=len(os.environ.get("UPLOAD_SIGNING_SECRET",""))>=32
+        return {"ready":ok,"missing":[] if ok else ["signing_secret"]}
     if AUTHORIZATION_BACKEND=="oauth_fingerprint":
         valid=bool(ALLOWED_TOKEN_DIGESTS) and all(len(x)==64 and all(c in "0123456789abcdef" for c in x) for x in ALLOWED_TOKEN_DIGESTS)
         return {"ready":valid,"missing":[] if valid else ["allowed_token_sha256"]}
