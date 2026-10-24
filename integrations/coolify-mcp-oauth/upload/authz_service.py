@@ -73,6 +73,9 @@ def authorize_token(bearer):
     if info.get("active") is not True or info.get("iss")!=EXPECTED_ISSUER:return None
     aud=info.get("aud")
     if EXPECTED_AUDIENCE not in (aud if isinstance(aud,list) else [aud]):return None
+    scopes=info.get("scope",info.get("scp",[]))
+    if isinstance(scopes,str):scopes=scopes.split()
+    if not isinstance(scopes,list) or "files:upload" not in scopes:return None
     sub=info.get("sub")
     if not isinstance(sub,str) or sub not in ALLOWED_SUBJECTS:return None
     return sub
