@@ -31,3 +31,16 @@ Treat the following as distinct, independently verified states:
 **Authorization:** Only `UPLOAD_AUTHORIZATION_MODE=strict` with an explicit verified `files:upload` permission and principal is allowed. A successful OAuth login/initialize alone cannot grant upload rights; `oauth_login` and unknown modes deny. Revise any staging configuration relying on the previous login-only mode before deployment.
 
 **Claims:** A successful PR check or local unit test does not certify public HTTPS routing, attachment-byte access from ChatGPT, production readiness, full malware safety, SFTP arrival, or WordPress installation. In reports, include the verified state, artifact digest, target, and evidence; use `not_verified` for missing stages.
+
+## Two executable intake methods (explicit client, no invented ChatGPT file access)
+
+The checked-in `upload/attachment_transport_client.py` provides both paths through the same strict OAuth upload sidecar. The caller must obtain the source bytes or HTTPS URL separately and lawfully; it cannot discover ChatGPT attachments or read a `file_uri` from MCP metadata.
+
+1. **Binary upload from an authorized local file** (no Base64 at the client):
+   `MAD4B_UPLOAD_OAUTH_TOKEN=... python3 attachment_transport_client.py --origin https://<configured-upload-host> --file /path/to/authorized-attachment.zip --sha256 <expected-64-hex>`.
+   The helper requests a short-lived SHA-bound upload grant from `/v1/grants`, then sends application/octet-stream bytes to `/v1/uploads`.
+2. **HTTPS source import:** 
+   `MAD4B_UPLOAD_OAUTH_TOKEN=... python3 attachment_transport_client.py --origin https://<configured-upload-host> --url https://<operator-allowlisted-source>/archive.zip --sha256 <expected-64-hex>`.
+   The service accepts only the operator's exact `UPLOAD_URL_ALLOWED_HOSTS`; its URL importer pins public DNS resolution, refuses redirects and verifies full SHA-256. Private attachment URLs must not be assumed reachable or permitted.
+
+Both methods return **quarantined**, never installed or delivered to VPS. A later authenticated `upload_server_file` promotion and independent VPS hash readback are required. Do not put tokens or signed URLs in CI logs, shell history or issue comments. OAuth permission `files:upload` must be actually enforced before enabling either route.
