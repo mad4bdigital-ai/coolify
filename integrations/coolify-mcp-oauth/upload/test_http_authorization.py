@@ -17,12 +17,12 @@ class HTTPTests(unittest.TestCase):
         c.request("POST","/v1/grants",payload,{"Authorization":"Bearer legitimate-but-readonly","Content-Type":"application/json"})
         r=c.getresponse();v=(r.status,json.loads(r.read()));c.close();return v
     def test_readonly_account_denied(self):
-        with patch("server.authorization.authorize",return_value=None):
+        with patch("server.authorization.authorize_upload",return_value=None):
             status,data=self.post()
         self.assertEqual(status,403)
         self.assertEqual(data["error"],"upload_permission_required")
     def test_explicit_upload_permission_allows_grant(self):
-        with patch("server.authorization.authorize",return_value="approved-user"):
+        with patch("server.authorization.authorize_upload",return_value="approved-user"):
             status,data=self.post()
         self.assertEqual(status,201)
         self.assertIn("upload_token",data)
