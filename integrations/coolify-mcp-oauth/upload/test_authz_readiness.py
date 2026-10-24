@@ -20,6 +20,16 @@ class ReadinessTests(unittest.TestCase):
     def test_fingerprint_readiness_defaults_to_denied(self):
         with patch.object(service,"AUTHORIZATION_BACKEND","oauth_fingerprint"),patch.object(service,"ALLOWED_TOKEN_DIGESTS",set()):
             self.assertEqual(service.readiness()["ready"],False)
+    def test_registry_assertion_login_authorization(self):
+        import authz_service as auth
+        import json,base64,hmac,time
+        subject="oauth-sub-123"
+        secret="a"*64
+        encoded=base64.urlsafe_b64encode(json.dumps({"sub":subject,"aud":"mad4b-upload-authz","permission":"files:upload","exp":int(time.time())+30},separators=(",",":"),sort_keys=True).encode()).rstrip(b"=").decode()
+        token="Bearer mad4b."+encoded+"."+hmac.new(secret.encode(),encoded.encode(),hashlib.sha256).hexdigest()
+        with patch.dict(auth.os.environ,{"UPLOAD_SIGNING_SECRET":secret}),patch.object(auth,"ALLOWED_SUBJECTS",set()):
+            self.assertEqual(auth.authorize_registry_assertion(token),subject)
+            self.assertIsNone(auth.authorize_registry_assertion(token[:-1]+"0"))
     def test_random_bearer_denied(self):
         self.assertIsNone(service.authorize_token("Bearer not-a-verified-token"))
 if __name__=="__main__":unittest.main()
