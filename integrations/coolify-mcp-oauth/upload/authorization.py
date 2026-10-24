@@ -48,3 +48,41 @@ def authorize(bearer: str, endpoint: str | None = None) -> str | None:
     if any(ord(c) < 33 or ord(c) > 126 for c in subject):
         return None
     return subject
+
+# Explicit staging override: authenticated OAuth proxy sessions may upload without
+# external token introspection. Not the same as files:upload scope verification.
+import hashlib
+
+def oauth_login_authorize(bearer: str, verify_url: str | None = None) -> str | None:
+    if not bearer.startswith("Bearer ") or not (8 < len(bearer) <= 8192):
+        return None
+    url = verify_url or os.environ.get("UPLOAD_OAUTH_VERIFY_URL","")
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "http" or parsed.hostname != "coolify-mcp-oauth" or parsed.port != 8080 or parsed.path != "/mcp":
+        return None
+    payload=json.dumps({"jsonrpc":"2.0","id":"upload-auth","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"upload-auth-check","version":"1"}}}).encode()
+    req=urllib.request.Request(url,data=payload,method="POST",headers={"Authorization":bearer,"Content-Type":"application/json","Accept":"application/json, text/event-stream","MCP-Protocol-Version":"2025-11-25"})
+    try:
+        with urllib.request.urlopen(req,timeout=5) as response:
+            if response.status!=200:return None
+            raw=response.read(16385)
+            if len(raw)>16384:return None
+            if "text/event-stream" in response.headers.get("Content-Type",""):
+                found=False
+                for line in raw.decode("utf-8","replace").splitlines():
+                    if line.startswith("data: "):
+                        obj=json.loads(line[6:])
+                        if obj.get("id")=="upload-auth" and isinstance(obj.get("result"),dict):found=True
+                if not found:return None
+            else:
+                obj=json.loads(raw)
+                if obj.get("id")!="upload-auth" or not isinstance(obj.get("result"),dict):return None
+    except (urllib.error.URLError,ValueError,TimeoutError,OSError):return None
+    # No durable user identity is asserted by initialize; bind transfers to this token.
+    return hashlib.sha256(bearer.encode()).hexdigest()
+
+def authorize_upload(bearer: str) -> str | None:
+    mode=os.environ.get("UPLOAD_AUTHORIZATION_MODE","strict").strip().lower()
+    if mode=="oauth_login":return oauth_login_authorize(bearer)
+    if mode=="strict":return authorize(bearer)
+    return None
