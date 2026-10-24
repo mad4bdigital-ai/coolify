@@ -118,6 +118,27 @@ class RegistryTests(unittest.TestCase):
                 with patch.object(server,"call_provider",return_value={"result":{"tools":[]}}) as caller:
                     self.assertEqual(server.authorize_identity("Bearer personal"),"coolify")
                     self.assertEqual(caller.call_args.args[2],"Bearer personal")
+    def test_large_non_upload_is_rejected(self):
+        from io import BytesIO
+        import json
+        req=server.Handler.__new__(server.Handler)
+        raw=json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"coolify_help","arguments":{"unused":"a"*1048576}}}).encode()
+        req.path="/mcp";req.headers={"Authorization":"Bearer valid","Content-Length":str(len(raw))};req.rfile=BytesIO(raw)
+        seen=[];req.respond=lambda code,data:seen.append((code,data))
+        with patch.object(server,"authorize_identity",return_value="coolify"),patch.object(server,"discover") as d:
+            req.do_POST()
+        self.assertEqual(seen[0][0],413)
+        d.assert_not_called()
+    def test_large_upload_reaches_discovery(self):
+        from io import BytesIO
+        import json
+        req=server.Handler.__new__(server.Handler)
+        raw=json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"upload__upload_attachment","arguments":{"content_base64":"a"*1100000}}}).encode()
+        req.path="/mcp";req.headers={"Authorization":"Bearer valid","Content-Length":str(len(raw))};req.rfile=BytesIO(raw)
+        seen=[];req.respond=lambda code,data:seen.append((code,data))
+        with patch.object(server,"authorize_identity",return_value="upload_oauth"),patch.object(server,"discover",return_value=([],{})):
+            req.do_POST()
+        self.assertEqual(seen[0][0],200)
     def test_bad_provider_name_denied(self):
         with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":""}]}}):
             with self.assertRaisesRegex(ValueError,"invalid_tool_name"):
