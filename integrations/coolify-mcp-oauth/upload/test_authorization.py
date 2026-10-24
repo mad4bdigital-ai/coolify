@@ -30,6 +30,14 @@ class AuthorizationTests(unittest.TestCase):
     def test_verified_upload_permission(self):
         with patch.object(authorization.urllib.request,"urlopen",return_value=Response({"allowed":True,"sub":"user123","permission":"files:upload"})):
             self.assertEqual(authorization.authorize("Bearer token",ENDPOINT),"user123")
+    def test_oauth_login_only_mode_always_denied(self):
+        with patch.dict(authorization.os.environ, {"UPLOAD_AUTHORIZATION_MODE":"oauth_login"}):
+            with patch.object(authorization,"authorize") as permission_check:
+                self.assertIsNone(authorization.authorize_upload("Bearer example-token"))
+                permission_check.assert_not_called()
+    def test_unknown_auth_mode_denied(self):
+        with patch.dict(authorization.os.environ, {"UPLOAD_AUTHORIZATION_MODE":"unknown"}):
+            self.assertIsNone(authorization.authorize_upload("Bearer example-token"))
     def test_missing_subject_denied(self):
         with patch.object(authorization.urllib.request,"urlopen",return_value=Response({"allowed":True,"permission":"files:upload"})):
             self.assertIsNone(authorization.authorize("Bearer token",ENDPOINT))
