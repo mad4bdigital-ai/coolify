@@ -60,7 +60,9 @@ class Handler(BaseHTTPRequestHandler):
         try:return json.loads(self.rfile.read(int(length)))
         except (ValueError,UnicodeDecodeError):return None
     def do_GET(self):
-        return self.reply(200,{"status":"ok"}) if self.path=="/healthz" else self.reply(404,{"error":"not_found"})
+        if self.path=="/healthz":return self.reply(200,{"status":"ok"})
+        if self.path=="/internal/tool-catalog":return self.reply(200,{"tools":catalog.list_tools()})
+        return self.reply(404,{"error":"not_found"})
     def transfer_request(self):
         principal=self.upload_subject()
         if principal is None:return self.reply(403,{"error":"upload_permission_required"})
