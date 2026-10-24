@@ -67,9 +67,36 @@ def finish(root,payload):
     target=root/(h.hexdigest()+".bin")
     os.replace(part,target);meta.unlink()
     return {"state":"quarantined","sha256":h.hexdigest(),"bytes":data["size"]}
-OPS={"upload_begin":begin,"upload_chunk":append,"upload_status":status,"upload_commit":finish}
+
+def upload_file(root,payload,max_bytes):
+    """Single-call ingest when a MCP client can supply file bytes as base64."""
+    data=payload.get("content_base64")
+    expected=payload.get("sha256")
+    owner=payload.get("owner")
+    if not isinstance(data,str) or len(data)>((max_bytes+2)//3)*4+8:
+        raise ValueError("content_size_limit")
+    if not isinstance(expected,str) or not HEX.fullmatch(expected):
+        raise ValueError("invalid_sha256")
+    try: content=base64.b64decode(data,validate=True)
+    except (binascii.Error,ValueError):raise ValueError("invalid_base64")
+    if not 1<=len(content)<=max_bytes:raise ValueError("invalid_size")
+    if hashlib.sha256(content).hexdigest()!=expected:raise ValueError("checksum_mismatch")
+    root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    dest=root/(expected+".bin")
+    tmp=root/("."+secrets.token_hex(16)+".part")
+    try:
+        with open(tmp,"xb") as out:
+            os.fchmod(out.fileno(),0o600)
+            out.write(content);out.flush();os.fsync(out.fileno())
+        os.replace(tmp,dest)
+    finally:
+        if tmp.exists():tmp.unlink()
+    return {"state":"quarantined","sha256":expected,"bytes":len(content)}
+
+OPS={"upload_file":upload_file,"upload_begin":begin,"upload_chunk":append,"upload_status":status,"upload_commit":finish}
 def call(root,method,params,max_bytes):
     if method not in OPS:raise ValueError("unknown_tool")
     if not isinstance(params,dict):raise ValueError("invalid_parameters")
+    if method=="upload_file":return upload_file(root,params,max_bytes)
     if method=="upload_begin":return begin(root,params,max_bytes)
     return OPS[method](root,params)
