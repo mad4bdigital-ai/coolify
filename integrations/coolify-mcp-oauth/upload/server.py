@@ -73,6 +73,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(200,{"status":"ok"}) if self.path=="/healthz" else self.reply(404,{"error":"not_found"})
     def transfer_request(self):
         if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
+        principal=hashlib.sha256(self.headers.get("Authorization","").encode()).hexdigest()
         data=self.body_json()
         if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
         if self.path=="/mcp-upload":
@@ -97,6 +98,9 @@ class Handler(BaseHTTPRequestHandler):
             inputs=data
             mid=None
         try:
+            # Transfer ownership is scoped to the validated OAuth bearer; caller cannot override.
+            inputs=dict(inputs)
+            inputs["owner"]=principal
             result=transfer.call(TARGET,operation,inputs,MAX_BYTES)
             if self.path=="/mcp-upload":return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"content":[{"type":"text","text":json.dumps(result)}]}})
             return self.reply(200,result)
