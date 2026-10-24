@@ -25,7 +25,7 @@ class RegistryTests(unittest.TestCase):
         req.rfile=BytesIO(payload)
         seen=[]
         req.respond=lambda status,obj:seen.append((status,obj))
-        with patch.object(server,"verify_client_token",return_value=True),patch.object(server,"discover",side_effect=urllib.error.HTTPError("http://provider",403,"Forbidden",{},None)):
+        with patch.object(server,"authorize_identity",return_value="upload_oauth"),patch.object(server,"discover",side_effect=urllib.error.HTTPError("http://provider",403,"Forbidden",{},None)):
             req.do_POST()
         self.assertEqual(seen[0][0],403)
         self.assertEqual(seen[0][1]["error"],"provider_authorization_failed")
@@ -48,7 +48,7 @@ class RegistryTests(unittest.TestCase):
             request.respond=lambda code,data: received.append((code,data))
             request.do_POST()
             return received[0]
-        with patch.object(server,"verify_client_token",return_value=True),patch.object(server,"call_provider",side_effect=provider):
+        with patch.object(server,"authorize_identity",return_value="upload_oauth"),patch.object(server,"call_provider",side_effect=provider):
             code,response=post({"jsonrpc":"2.0","id":1,"method":"tools/list"})
             self.assertEqual(code,200)
             self.assertEqual(response["result"]["tools"][0]["name"],"upload__upload_server_file")
@@ -65,7 +65,7 @@ class RegistryTests(unittest.TestCase):
         request.rfile=BytesIO(raw)
         received=[]
         request.respond=lambda code,data:received.append((code,data))
-        with patch.object(server,"verify_client_token",return_value=True),patch.object(server,"call_provider",return_value={"result":{"tools":[]}}) as upstream:
+        with patch.object(server,"authorize_identity",return_value="upload_oauth"),patch.object(server,"call_provider",return_value={"result":{"tools":[]}}) as upstream:
             request.do_POST()
         self.assertEqual(received[0][0],200)
         self.assertTrue(received[0][1]["result"]["isError"])
@@ -92,6 +92,26 @@ class RegistryTests(unittest.TestCase):
             request.do_POST()
         self.assertEqual(received[0][0],401)
         upstream.assert_not_called()
+    def test_coolify_identity_excludes_upload(self):
+        with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":""},"upload":{"url":"http://upload:8080/mcp","prefix":"upload__"}},clear=True):
+            with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":"coolify_help"}]}}) as caller:
+                tools,routes=server.discover("Bearer core","coolify")
+        self.assertEqual([t["name"] for t in tools],["coolify_help"])
+        self.assertEqual(routes["coolify_help"][2],"Bearer core")
+        self.assertEqual(caller.call_count,1)
+    def test_upload_identity_excludes_core(self):
+        with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer privileged"},"upload":{"url":"http://upload:8080/mcp","prefix":"upload__"}},clear=True):
+            with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":"upload_file"}]}}) as caller:
+                tools,routes=server.discover("Bearer oauth","upload_oauth")
+        self.assertEqual([t["name"] for t in tools],["upload__upload_file"])
+        self.assertEqual(routes["upload__upload_file"][2],"Bearer oauth")
+        self.assertEqual(caller.call_count,1)
+    def test_coolify_identity_uses_caller_token(self):
+        with patch.object(server,"verify_client_token",return_value=False):
+            with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer privileged"}},clear=True):
+                with patch.object(server,"call_provider",return_value={"result":{"tools":[]}}) as caller:
+                    self.assertEqual(server.authorize_identity("Bearer personal"),"coolify")
+                    self.assertEqual(caller.call_args.args[2],"Bearer personal")
     def test_bad_provider_name_denied(self):
         with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":""}]}}):
             with self.assertRaisesRegex(ValueError,"invalid_tool_name"):
