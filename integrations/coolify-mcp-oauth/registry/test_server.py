@@ -25,7 +25,7 @@ class RegistryTests(unittest.TestCase):
         req.rfile=BytesIO(payload)
         seen=[]
         req.respond=lambda status,obj:seen.append((status,obj))
-        with patch.object(server,"discover",side_effect=urllib.error.HTTPError("http://provider",403,"Forbidden",{},None)):
+        with patch.object(server,"verify_client_token",return_value=True),patch.object(server,"discover",side_effect=urllib.error.HTTPError("http://provider",403,"Forbidden",{},None)):
             req.do_POST()
         self.assertEqual(seen[0][0],403)
         self.assertEqual(seen[0][1]["error"],"provider_authorization_failed")
@@ -48,7 +48,7 @@ class RegistryTests(unittest.TestCase):
             request.respond=lambda code,data: received.append((code,data))
             request.do_POST()
             return received[0]
-        with patch.object(server,"call_provider",side_effect=provider):
+        with patch.object(server,"verify_client_token",return_value=True),patch.object(server,"call_provider",side_effect=provider):
             code,response=post({"jsonrpc":"2.0","id":1,"method":"tools/list"})
             self.assertEqual(code,200)
             self.assertEqual(response["result"]["tools"][0]["name"],"upload__upload_server_file")
@@ -65,7 +65,7 @@ class RegistryTests(unittest.TestCase):
         request.rfile=BytesIO(raw)
         received=[]
         request.respond=lambda code,data:received.append((code,data))
-        with patch.object(server,"call_provider",return_value={"result":{"tools":[]}}) as upstream:
+        with patch.object(server,"verify_client_token",return_value=True),patch.object(server,"call_provider",return_value={"result":{"tools":[]}}) as upstream:
             request.do_POST()
         self.assertEqual(received[0][0],200)
         self.assertTrue(received[0][1]["result"]["isError"])
@@ -80,6 +80,18 @@ class RegistryTests(unittest.TestCase):
             tools,routes=server.discover("Bearer user")
         self.assertEqual([t["name"] for t in tools],["coolify_help"])
         self.assertEqual(routes["coolify_help"][2],"Bearer trusted-core")
+    def test_invalid_oauth_cannot_reach_privileged_provider(self):
+        from io import BytesIO
+        request=server.Handler.__new__(server.Handler)
+        raw=b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+        request.path="/mcp";request.headers={"Authorization":"Bearer forged-value","Content-Length":str(len(raw))}
+        request.rfile=BytesIO(raw)
+        received=[]
+        request.respond=lambda code,data:received.append((code,data))
+        with patch.object(server,"verify_client_token",return_value=False), patch.object(server,"call_provider") as upstream:
+            request.do_POST()
+        self.assertEqual(received[0][0],401)
+        upstream.assert_not_called()
     def test_bad_provider_name_denied(self):
         with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":""}]}}):
             with self.assertRaisesRegex(ValueError,"invalid_tool_name"):
