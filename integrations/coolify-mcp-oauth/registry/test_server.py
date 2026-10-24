@@ -70,6 +70,16 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(received[0][0],200)
         self.assertTrue(received[0][1]["result"]["isError"])
         self.assertEqual(upstream.call_count,1)
+    def test_upload_auth_denial_preserves_coolify_catalog(self):
+        providers={"upload":{"url":"http://upload:8080/mcp","prefix":"upload__"},"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer trusted-core"}}
+        def fake(url,req,token):
+            if "upload" in url:
+                raise urllib.error.HTTPError(url,403,"Forbidden",{},None)
+            return {"result":{"tools":[{"name":"coolify_help","inputSchema":{"type":"object"}}]}}
+        with patch.dict(server.PROVIDERS,providers,clear=True),patch.object(server,"call_provider",side_effect=fake):
+            tools,routes=server.discover("Bearer user")
+        self.assertEqual([t["name"] for t in tools],["coolify_help"])
+        self.assertEqual(routes["coolify_help"][2],"Bearer trusted-core")
     def test_bad_provider_name_denied(self):
         with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":""}]}}):
             with self.assertRaisesRegex(ValueError,"invalid_tool_name"):
