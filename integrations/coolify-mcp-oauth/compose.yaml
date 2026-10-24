@@ -13,7 +13,7 @@ services:
       OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:?Google OAuth web client ID required}"
       OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:?Google OAuth web client secret required}"
       PROXY_BASE_URL: "${PROXY_BASE_URL:?Dedicated HTTPS adapter URL required}"
-      UPSTREAM_MCP_URL: "http://coolify:8080/mcp"
+      UPSTREAM_MCP_URL: "http://mcp-provider-registry:8080/mcp"
       UPSTREAM_AUTHORIZATION_HEADER: "${UPSTREAM_AUTHORIZATION_HEADER:?Read-only Coolify Bearer required}"
       TOKEN_SIGNING_SECRET: "${TOKEN_SIGNING_SECRET:?Unique strong signing key required}"
       REDIS_URL: "redis://oauth-redis:6379/0"
