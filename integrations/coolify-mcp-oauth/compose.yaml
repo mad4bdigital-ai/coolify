@@ -43,6 +43,7 @@ services:
       UPLOAD_OAUTH_VERIFY_URL: "http://coolify-mcp-oauth:8080/mcp"
       UPLOAD_MAX_BYTES: "33554432"
       UPLOAD_QUARANTINE: /data/quarantine
+      UPLOAD_URL_ALLOWED_HOSTS: "${UPLOAD_URL_ALLOWED_HOSTS:-}"
     volumes:
       - upload-quarantine:/data/quarantine
     expose:
