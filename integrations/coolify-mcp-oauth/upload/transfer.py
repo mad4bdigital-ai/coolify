@@ -1,5 +1,5 @@
 """OAuth-scoped resumable uploads, callable over HTTP and MCP. Quarantine only."""
-import base64, binascii, hashlib, json, os, re, secrets, time
+import base64, binascii, hashlib, json, os, re, secrets, time, fcntl
 from pathlib import Path
 
 ID=re.compile(r"^[a-f0-9]{32}$")
@@ -39,6 +39,7 @@ def append(root,payload):
     if not chunk or len(chunk)>CHUNK_MAX or offset+len(chunk)>data["size"]:raise ValueError("invalid_chunk_size")
     # Exclusive append position. A conflicting concurrent writer must fail closed.
     with open(part,"r+b",buffering=0) as f:
+        fcntl.flock(f.fileno(),fcntl.LOCK_EX)
         if f.seek(0,os.SEEK_END)!=offset:raise ValueError("offset_conflict")
         f.write(chunk);os.fsync(f.fileno())
     data["offset"]+=len(chunk)
