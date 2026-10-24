@@ -16,6 +16,7 @@ import transfer
 import url_import
 import authorization
 import server_storage
+import catalog
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_BYTES=int(os.environ.get("UPLOAD_MAX_BYTES",str(32*1024*1024)))
@@ -72,16 +73,11 @@ class Handler(BaseHTTPRequestHandler):
             if method=="initialize":
                 return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"mad4b-file-transfer","version":"0.1.0"}}})
             if method=="tools/list":
-                tools=[]
-                for name in transfer.OPS:
-                    props={"content_base64":{"type":"string"},"sha256":{"type":"string"}} if name=="upload_file" else ({"size":{"type":"integer"},"sha256":{"type":"string"}} if name=="upload_begin" else ({"transfer_id":{"type":"string"},"offset":{"type":"integer"},"base64":{"type":"string"}} if name=="upload_chunk" else {"transfer_id":{"type":"string"}}))
-                    tools.append({"name":name,"description":"Authorized resumable binary transfer; quarantines bytes, never executes files","inputSchema":{"type":"object","properties":props,"additionalProperties":False}})
-                tools.append({"name":"upload_server_file","description":"Copy a verified quarantine file into the fixed VPS upload directory; requires authenticated OAuth","inputSchema":{"type":"object","properties":{"sha256":{"type":"string"},"filename":{"type":"string"}},"required":["sha256","filename"],"additionalProperties":False}})
-                tools.append({"name":"upload_from_url","description":"Import allowlisted HTTPS download URL to quarantine after SHA256 verification","inputSchema":{"type":"object","properties":{"url":{"type":"string"},"sha256":{"type":"string"}},"required":["url","sha256"]}})
-                return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"tools":tools}})
+                return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"tools":catalog.list_tools()}})
             if method!="tools/call":return self.reply(400,{"error":"unsupported_mcp_method"})
             args=data.get("params") or {}
             operation=args.get("name")
+            if not catalog.supported(operation):return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"isError":True,"content":[{"type":"text","text":"unknown_tool"}]}})
             inputs=args.get("arguments") or {}
         else:
             operation=self.path.rsplit("/",1)[-1]
