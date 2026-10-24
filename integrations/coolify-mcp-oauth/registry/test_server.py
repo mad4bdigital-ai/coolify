@@ -92,13 +92,19 @@ class RegistryTests(unittest.TestCase):
             request.do_POST()
         self.assertEqual(received[0][0],401)
         upstream.assert_not_called()
-    def test_coolify_identity_excludes_upload(self):
-        with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":""},"upload":{"url":"http://upload:8080/mcp","prefix":"upload__"}},clear=True):
-            with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":"coolify_help"}]}}) as caller:
+    def test_coolify_identity_lists_upload_but_does_not_grant_it(self):
+        import io
+        class CatalogResponse:
+            def __enter__(self):return self
+            def __exit__(self,*args):return False
+            def read(self,n):return b'{"tools":[{"name":"upload_attachment","inputSchema":{"type":"object"}}]}'
+        with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":""},"upload":{"url":"http://public-file-upload:8080/mcp-upload","prefix":"upload__"}},clear=True):
+            with patch.object(server.urllib.request,"urlopen",return_value=CatalogResponse()) as discovery,patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":"coolify_help"}]}}) as calls:
                 tools,routes=server.discover("Bearer core","coolify")
-        self.assertEqual([t["name"] for t in tools],["coolify_help"])
-        self.assertEqual(routes["coolify_help"][2],"Bearer core")
-        self.assertEqual(caller.call_count,1)
+        self.assertEqual({t["name"] for t in tools},{"coolify_help","upload__upload_attachment"})
+        self.assertEqual(routes["upload__upload_attachment"][2],"Bearer core")
+        self.assertEqual(calls.call_count,1)
+        self.assertEqual(discovery.call_count,1)
     def test_unified_oauth_uses_proxy_without_core_server_credential(self):
         providers={"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer privileged"},"upload":{"url":"http://upload:8080/mcp","prefix":"upload__"}}
         seen=[]
