@@ -9,6 +9,15 @@ class CatalogTests(unittest.TestCase):
         with patch.dict(catalog.transfer.OPS,{"upload_future_test":lambda *a:None}):
             self.assertTrue(catalog.supported("upload_future_test"))
             self.assertIn("upload_future_test",{x["name"] for x in catalog.list_tools()})
+    def test_descriptions_cannot_claim_native_attachment_resolution(self):
+        descriptors={d["name"]:d for d in catalog.list_tools()}
+        attachment=descriptors["upload_attachment"]
+        self.assertIn("Does NOT resolve ChatGPT attachment IDs",attachment["description"])
+        self.assertIn("content_base64",attachment["inputSchema"]["required"])
+        self.assertNotIn("file_uri",attachment["inputSchema"]["properties"])
+        server=descriptors["upload_server_file"]
+        self.assertIn("Requires prior successful upload",server["description"])
+        self.assertIn("does NOT install",server["description"])
     def test_unknown_rejected(self):
         self.assertFalse(catalog.supported("../unsafe"))
 if __name__=="__main__":unittest.main()
