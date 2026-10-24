@@ -99,13 +99,19 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual([t["name"] for t in tools],["coolify_help"])
         self.assertEqual(routes["coolify_help"][2],"Bearer core")
         self.assertEqual(caller.call_count,1)
-    def test_upload_identity_excludes_core(self):
-        with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer privileged"},"upload":{"url":"http://upload:8080/mcp","prefix":"upload__"}},clear=True):
-            with patch.object(server,"call_provider",return_value={"result":{"tools":[{"name":"upload_file"}]}}) as caller:
-                tools,routes=server.discover("Bearer oauth","upload_oauth")
-        self.assertEqual([t["name"] for t in tools],["upload__upload_file"])
-        self.assertEqual(routes["upload__upload_file"][2],"Bearer oauth")
-        self.assertEqual(caller.call_count,1)
+    def test_unified_oauth_uses_proxy_without_core_server_credential(self):
+        providers={"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer privileged"},"upload":{"url":"http://upload:8080/mcp","prefix":"upload__"}}
+        seen=[]
+        def fake(url,req,token):
+            seen.append((url,token))
+            name="coolify_help" if "coolify-mcp-oauth" in url else "upload_file"
+            return {"result":{"tools":[{"name":name}]}}
+        with patch.dict(server.PROVIDERS,providers,clear=True),patch.object(server,"call_provider",side_effect=fake):
+            tools,routes=server.discover("Bearer oauth","upload_oauth")
+        self.assertEqual({t["name"] for t in tools},{"coolify_help","upload__upload_file"})
+        self.assertTrue(all(token=="Bearer oauth" for _,token in seen))
+        self.assertEqual(routes["coolify_help"][0],"http://coolify-mcp-oauth:8080/mcp")
+        self.assertEqual(routes["upload__upload_file"][0],"http://upload:8080/mcp")
     def test_coolify_identity_uses_caller_token(self):
         with patch.object(server,"verify_client_token",return_value=False):
             with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer privileged"}},clear=True):
