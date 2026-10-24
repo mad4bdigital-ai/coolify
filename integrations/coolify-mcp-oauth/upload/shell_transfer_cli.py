@@ -20,16 +20,33 @@ def upload(path, base_url, bearer, chunk_bytes=256*1024):
             method="POST")
         with urllib.request.urlopen(req,timeout=60) as response:
             return json.load(response)
-    session=request("begin",{"size":length,"sha256":digest})
+    state=file.with_name(file.name+".mad4b-transfer.json")
+    session=None
+    if state.exists():
+        previous=json.loads(state.read_text())
+        if previous.get("sha256")==digest and previous.get("size")==length:
+            try:
+                remote=request("status",{"transfer_id":previous["transfer_id"]})
+                if remote.get("sha256")==digest and remote.get("size")==length:
+                    session={"transfer_id":previous["transfer_id"],"offset":remote["offset"]}
+            except Exception:
+                session=None
+    if session is None:
+        session=request("begin",{"size":length,"sha256":digest})
+        state.write_text(json.dumps({"transfer_id":session["transfer_id"],"sha256":digest,"size":length}))
+        os.chmod(state,0o600)
     ident=session["transfer_id"]
     with file.open("rb") as src:
-        offset=0
+        offset=session["offset"]
+        src.seek(offset)
         while True:
             part=src.read(chunk_bytes)
             if not part:break
             response=request("chunk",{"transfer_id":ident,"offset":offset,"base64":base64.b64encode(part).decode()})
             offset=response["offset"]
-    return request("commit",{"transfer_id":ident})
+    result=request("commit",{"transfer_id":ident})
+    state.unlink(missing_ok=True)
+    return result
 
 if __name__=="__main__":
     p=argparse.ArgumentParser()
