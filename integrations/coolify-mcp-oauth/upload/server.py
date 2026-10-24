@@ -64,9 +64,9 @@ class Handler(BaseHTTPRequestHandler):
                 data=json.loads(raw)
                 return data.get("id")=="upload-auth" and isinstance(data.get("result"),dict)
         except (urllib.error.URLError,ValueError,TimeoutError,OSError):return False
-    def body_json(self):
+    def body_json(self,limit=8192):
         length=self.headers.get("Content-Length","")
-        if not length.isdecimal() or int(length)>8192:return None
+        if not length.isdecimal() or int(length)>limit:return None
         try:return json.loads(self.rfile.read(int(length)))
         except (ValueError,UnicodeDecodeError):return None
     def do_GET(self):
@@ -74,7 +74,7 @@ class Handler(BaseHTTPRequestHandler):
     def transfer_request(self):
         if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
         principal=hashlib.sha256(self.headers.get("Authorization","").encode()).hexdigest()
-        data=self.body_json()
+        data=self.body_json(limit=MAX_BYTES*2+8192 if self.path=="/mcp-upload" else 8192)
         if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
         if self.path=="/mcp-upload":
             mid=data.get("id")
@@ -84,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
             if method=="tools/list":
                 tools=[]
                 for name in transfer.OPS:
-                    props={"size":{"type":"integer"},"sha256":{"type":"string"}} if name=="upload_begin" else ({"transfer_id":{"type":"string"},"offset":{"type":"integer"},"base64":{"type":"string"}} if name=="upload_chunk" else {"transfer_id":{"type":"string"}})
+                    props={"content_base64":{"type":"string"},"sha256":{"type":"string"}} if name=="upload_file" else ({"size":{"type":"integer"},"sha256":{"type":"string"}} if name=="upload_begin" else ({"transfer_id":{"type":"string"},"offset":{"type":"integer"},"base64":{"type":"string"}} if name=="upload_chunk" else {"transfer_id":{"type":"string"}}))
                     tools.append({"name":name,"description":"Authorized resumable binary transfer; quarantines bytes, never executes files","inputSchema":{"type":"object","properties":props,"additionalProperties":False}})
                 return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"tools":tools}})
             if method!="tools/call":return self.reply(400,{"error":"unsupported_mcp_method"})
