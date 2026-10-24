@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import transfer
+import catalog
 import server_storage
 
 class FunctionalTransferTests(unittest.TestCase):
@@ -20,6 +21,11 @@ class FunctionalTransferTests(unittest.TestCase):
             self.assertEqual(result["state"],"stored_on_vps")
             self.assertEqual(result["bytes"],len(data))
             self.assertEqual(hashlib.sha256((destination/"sample.zip").read_bytes()).hexdigest(),digest)
+    def test_attachment_tool_is_in_catalog(self):
+        tools={tool["name"]:tool for tool in catalog.list_tools()}
+        self.assertIn("upload_attachment",tools)
+        self.assertEqual(set(tools["upload_attachment"]["inputSchema"]["required"]),{"content_base64","sha256","filename"})
+        self.assertTrue(catalog.supported("upload_attachment"))
     def test_tampered_bytes_are_not_saved(self):
         with tempfile.TemporaryDirectory() as temp:
             quarantine=Path(temp)/"quarantine"
