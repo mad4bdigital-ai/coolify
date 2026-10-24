@@ -14,6 +14,7 @@ import urllib.request
 import urllib.error
 import transfer
 import url_import
+import authorization
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_BYTES=int(os.environ.get("UPLOAD_MAX_BYTES",str(32*1024*1024)))
@@ -47,24 +48,10 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers();self.wfile.write(blob)
     def auth(self):
         return self.headers.get("Authorization","").removeprefix("Bearer ")
-    def oauth_authorized(self):
-        bearer=self.headers.get("Authorization","")
-        if not bearer.startswith("Bearer ") or len(bearer)>8192:return False
-        payload=json.dumps({"jsonrpc":"2.0","id":"upload-auth","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"upload-oauth-authcheck","version":"1"}}}).encode()
-        req=urllib.request.Request(OAUTH_VERIFY_URL,data=payload,method="POST",headers={"Authorization":bearer,"Content-Type":"application/json","Accept":"application/json, text/event-stream","MCP-Protocol-Version":"2025-11-25"})
-        try:
-            with urllib.request.urlopen(req,timeout=5) as resp:
-                if resp.status!=200:return False
-                raw=resp.read(16384)
-                if "text/event-stream" in resp.headers.get("Content-Type",""):
-                    for line in raw.decode("utf-8","replace").splitlines():
-                        if line.startswith("data: "):
-                            data=json.loads(line[6:])
-                            if data.get("id")=="upload-auth" and isinstance(data.get("result"),dict):return True
-                    return False
-                data=json.loads(raw)
-                return data.get("id")=="upload-auth" and isinstance(data.get("result"),dict)
-        except (urllib.error.URLError,ValueError,TimeoutError,OSError):return False
+    def upload_subject(self):
+        # Authentication alone is insufficient: require verified files:upload permission.
+        return authorization.authorize(self.headers.get("Authorization",""))
+
     def body_json(self,limit=8192):
         length=self.headers.get("Content-Length","")
         if not length.isdecimal() or int(length)>limit:return None
@@ -73,8 +60,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         return self.reply(200,{"status":"ok"}) if self.path=="/healthz" else self.reply(404,{"error":"not_found"})
     def transfer_request(self):
-        if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
-        principal=hashlib.sha256(self.headers.get("Authorization","").encode()).hexdigest()
+        principal=self.upload_subject()
+        if principal is None:return self.reply(403,{"error":"upload_permission_required"})
         body_limit=(MAX_BYTES*2+8192 if self.path=="/mcp-upload" else (transfer.CHUNK_MAX*2+8192 if self.path=="/v1/transfers/chunk" else 8192))
         data=self.body_json(limit=body_limit)
         if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
@@ -116,7 +103,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(422,{"error":str(exc)})
     def do_POST(self):
         if self.path=="/v1/import-url":
-            if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
+            if self.upload_subject() is None:return self.reply(403,{"error":"upload_permission_required"})
             data=self.body_json()
             if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
             hosts={h.strip().lower() for h in os.environ.get("UPLOAD_URL_ALLOWED_HOSTS","").split(",") if h.strip()}
@@ -128,7 +115,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=="/mcp-upload" or self.path in ("/v1/transfers/begin","/v1/transfers/chunk","/v1/transfers/status","/v1/transfers/commit"):
             return self.transfer_request()
         if self.path=="/v1/grants":
-            if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
+            if self.upload_subject() is None:return self.reply(403,{"error":"upload_permission_required"})
             data=self.body_json()
             if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
             # No fixed maximum lifetime. Each grant has its own requested positive expiry.
@@ -142,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
             grant={"jti":secrets.token_hex(16),"scope":"upload","exp":exp,"sha256":sha,"max_bytes":limit}
             return self.reply(201,{"upload_token":mint(grant),"expires_at":exp,"grant_id":grant["jti"]})
         if self.path=="/v1/grants/revoke":
-            if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
+            if self.upload_subject() is None:return self.reply(403,{"error":"upload_permission_required"})
             data=self.body_json()
             jti=data.get("grant_id") if isinstance(data,dict) else None
             if not isinstance(jti,str) or not re.fullmatch("[a-f0-9]{32}",jti):return self.reply(422,{"error":"invalid_grant_id"})
