@@ -18,23 +18,16 @@ def call_provider(url,request,token):
     with urllib.request.urlopen(req,timeout=8) as response:
         if response.status!=200:raise ValueError("provider_unavailable")
         return json.loads(response.read(1024*1024))
-def verify_client_token(bearer):
-    """Fail closed: an arbitrary Bearer header is never authorization."""
-    url="http://coolify-mcp-oauth:8080/mcp"
-    payload={"jsonrpc":"2.0","id":"registry-auth","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"mad4b-registry","version":"1"}}}
-    try:
-        response=call_provider(url,payload,bearer)
-        return isinstance(response,dict) and isinstance(response.get("result"),dict) and response["result"].get("serverInfo") is not None
-    except (ValueError,KeyError,OSError,urllib.error.URLError):
-        return False
-
 def authorize_identity(bearer):
-    """Classify credentials without elevating one provider's privileges."""
-    if verify_client_token(bearer):
-        return "upload_oauth"
+    """Trust only a bearer authorized by the native Coolify MCP.
+
+    The external OAuth proxy authenticates ChatGPT and forwards its configured,
+    scoped upstream Coolify credential to this registry. Never call the OAuth
+    proxy from here: after setting its upstream to Registry that creates a
+    recursive dependency and breaks tools discovery / refresh.
+    """
     core=PROVIDERS.get("coolify")
-    if core is None:
-        return None
+    if core is None:return None
     try:
         answer=call_provider(core["url"],{"jsonrpc":"2.0","id":"core-auth","method":"tools/list","params":{}},bearer)
         if isinstance(answer.get("result",{}).get("tools"),list):
