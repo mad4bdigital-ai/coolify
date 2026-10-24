@@ -88,10 +88,10 @@ class RegistryTests(unittest.TestCase):
         request.rfile=BytesIO(raw)
         received=[]
         request.respond=lambda code,data:received.append((code,data))
-        with patch.object(server,"verify_client_token",return_value=False), patch.object(server,"call_provider") as upstream:
+        with patch.object(server,"call_provider",side_effect=OSError("denied")) as upstream:
             request.do_POST()
         self.assertEqual(received[0][0],401)
-        upstream.assert_not_called()
+        self.assertEqual(upstream.call_count,1)
     def test_coolify_identity_lists_upload_but_does_not_grant_it(self):
         import io
         class CatalogResponse:
@@ -119,7 +119,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(routes["coolify_help"][0],"http://coolify-mcp-oauth:8080/mcp")
         self.assertEqual(routes["upload__upload_file"][0],"http://upload:8080/mcp")
     def test_coolify_identity_uses_caller_token(self):
-        with patch.object(server,"verify_client_token",return_value=False):
+        with patch.object(server,"call_provider",return_value={"result":{"tools":[]}}):
             with patch.dict(server.PROVIDERS,{"coolify":{"url":"http://coolify:8080/mcp","prefix":"","authorization":"Bearer privileged"}},clear=True):
                 with patch.object(server,"call_provider",return_value={"result":{"tools":[]}}) as caller:
                     self.assertEqual(server.authorize_identity("Bearer personal"),"coolify")
