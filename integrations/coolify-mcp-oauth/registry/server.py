@@ -7,6 +7,10 @@ import json, os, urllib.request, urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROVIDERS={"upload":{"url":"http://public-file-upload:8080/mcp-upload","prefix":"upload__"}}
+# Optional Coolify provider: use the existing internal Coolify MCP implementation,
+# never the future public aggregate URL, to avoid a proxy loop.
+if os.environ.get("COOLIFY_SOURCE_MCP_URL") and os.environ.get("COOLIFY_SOURCE_AUTHORIZATION"):
+    PROVIDERS["coolify"]={"url":os.environ["COOLIFY_SOURCE_MCP_URL"],"prefix":"" , "authorization":os.environ["COOLIFY_SOURCE_AUTHORIZATION"]}
 def call_provider(url,request,token):
     body=json.dumps(request).encode()
     headers={"Content-Type":"application/json","Accept":"application/json","Authorization":token}
@@ -17,14 +21,15 @@ def call_provider(url,request,token):
 def discover(token):
     tools=[];routes={}
     for provider,config in PROVIDERS.items():
-        answer=call_provider(config["url"],{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},token)
+        effective_token=config.get("authorization",token)
+        answer=call_provider(config["url"],{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
         for tool in answer.get("result",{}).get("tools",[]):
             name=tool.get("name")
             if not isinstance(name,str) or not name or len(name)>96:raise ValueError("invalid_tool_name")
             qualified=config["prefix"]+name
             if qualified in routes:raise ValueError("tool_collision")
             item=dict(tool);item["name"]=qualified
-            tools.append(item);routes[qualified]=(config["url"],name)
+            tools.append(item);routes[qualified]=(config["url"],name,effective_token)
     return tools,routes
 
 class Handler(BaseHTTPRequestHandler):
@@ -51,8 +56,8 @@ class Handler(BaseHTTPRequestHandler):
             if method!="tools/call":return self.respond(400,{"error":"unsupported_method"})
             p=request.get("params") or {};qualified=p.get("name")
             if qualified not in routes:return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"isError":True,"content":[{"type":"text","text":"unknown_tool"}]}})
-            url,name=routes[qualified]
-            result=call_provider(url,{"jsonrpc":"2.0","id":identifier,"method":"tools/call","params":{"name":name,"arguments":p.get("arguments") or {}}},auth)
+            url,name,forward_auth=routes[qualified]
+            result=call_provider(url,{"jsonrpc":"2.0","id":identifier,"method":"tools/call","params":{"name":name,"arguments":p.get("arguments") or {}}},forward_auth)
             return self.respond(200,result)
         except urllib.error.HTTPError as exc:
             if exc.code in (401,403):return self.respond(exc.code,{"error":"provider_authorization_failed"})
