@@ -18,6 +18,16 @@ def call_provider(url,request,token):
     with urllib.request.urlopen(req,timeout=8) as response:
         if response.status!=200:raise ValueError("provider_unavailable")
         return json.loads(response.read(1024*1024))
+def verify_client_token(bearer):
+    """Fail closed: an arbitrary Bearer header is never authorization."""
+    url="http://coolify-mcp-oauth:8080/mcp"
+    payload={"jsonrpc":"2.0","id":"registry-auth","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"mad4b-registry","version":"1"}}}
+    try:
+        response=call_provider(url,payload,bearer)
+        return isinstance(response,dict) and isinstance(response.get("result"),dict) and response["result"].get("serverInfo") is not None
+    except (ValueError,KeyError,OSError,urllib.error.URLError):
+        return False
+
 def discover(token):
     tools=[];routes={}
     for provider,config in PROVIDERS.items():
@@ -52,6 +62,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path!="/mcp":return self.respond(404,{"error":"not_found"})
         auth=self.headers.get("Authorization","")
         if not auth.startswith("Bearer ") or len(auth)>8192:return self.respond(401,{"error":"authentication_required"})
+        if not verify_client_token(auth):return self.respond(401,{"error":"invalid_oauth_session"})
         length=self.headers.get("Content-Length","")
         if not length.isdecimal() or int(length)>1024*1024:return self.respond(413,{"error":"request_too_large"})
         try:
