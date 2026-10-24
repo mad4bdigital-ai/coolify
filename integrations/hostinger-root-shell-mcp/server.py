@@ -9,6 +9,7 @@ import shlex
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from registry import list_targets
+import hosting_upload
 from ssh_binding import probe_authenticated_ssh
 from providers import check_reachability, check_https_api
 from hostinger_gateway import list_hostinger_accounts, plan_import
@@ -44,6 +45,26 @@ server = FastMCP(
     stateless_http=True,
     instructions="Root-level shell on the enrolled VPS. All commands run as root via SSH. Commands may change or delete production data. Never claim commands are read-only unless they are.",
 )
+
+@server.tool()
+def hosting_upload_begin(target_id: str, size: int, sha256: str) -> dict:
+    """Begin a SHA-256-scoped, resumable quarantine transfer to an enrolled SSH hosting account."""
+    return hosting_upload.begin(target_id, size, sha256)
+
+@server.tool()
+def hosting_upload_chunk(target_id: str, transfer_id: str, offset: int, content_base64: str) -> dict:
+    """Append a bounded base64 chunk to a target-bound transfer. No host paths accepted."""
+    return hosting_upload.chunk(target_id, transfer_id, offset, content_base64)
+
+@server.tool()
+def hosting_upload_status(target_id: str, transfer_id: str) -> dict:
+    """Read target-bound transfer offset and digest without exposing file content."""
+    return hosting_upload.status(target_id, transfer_id)
+
+@server.tool()
+async def hosting_upload_commit(target_id: str, transfer_id: str) -> dict:
+    """Checksum-verify then SFTP only to the enrolled account's fixed quarantine directory."""
+    return await hosting_upload.commit(target_id, transfer_id)
 
 @server.tool()
 def list_infrastructure_targets(environment: str = "", kind: str = "") -> dict:

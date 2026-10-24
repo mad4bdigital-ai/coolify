@@ -9,7 +9,11 @@ services:
     environment:
       SHELL_SSH_HOST: "${SHELL_SSH_HOST:?VPS address required}"
       SHELL_SSH_PORT: "${SHELL_SSH_PORT:-22}"
+      INFRA_UPLOAD_SPOOL: "/data/hosting-uploads"
     volumes:
+      - type: volume
+        source: hosting-upload-spool
+        target: /data/hosting-uploads
       # Long-form binds prevent Coolify from interpreting placeholder text as
       # Docker's short source:target:mode syntax. No auto-created key paths.
       - type: bind
@@ -82,3 +86,6 @@ networks:
     internal: true
   oauth-private:
     internal: true
+
+volumes:
+  hosting-upload-spool: {}
