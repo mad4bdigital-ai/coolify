@@ -3,7 +3,7 @@
 This proxy is intended to sit behind an authenticated MCP gateway. Provider
 tools are namespaced and routed only to fixed, trusted internal services.
 """
-import json, os, urllib.request, urllib.error
+import json, os, urllib.request, urllib.error, socket, hmac, hashlib, base64, time, re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROVIDERS={"upload":{"url":"http://public-file-upload:8080/mcp-upload","prefix":"upload__"}}
@@ -66,6 +66,25 @@ def discover(token,identity=None):
             tools.append(item);routes[qualified]=(effective_url,name,effective_token)
     return tools,routes
 
+def verified_proxy_subject(handler):
+    # Only the OAuth proxy itself may assert identity. Public Traefik routes
+    # and other callers cannot inject an X-User-Sub header.
+    subject=handler.headers.get("X-User-Sub","")
+    if not re.fullmatch(r"[A-Za-z0-9@._:-]{1,200}",subject):return None
+    peer=handler.client_address[0]
+    try:
+        trusted={row[4][0] for row in socket.getaddrinfo("coolify-mcp-oauth",None,type=socket.SOCK_STREAM)}
+    except socket.gaierror:return None
+    return subject if peer in trusted else None
+
+def grant_upload_subject(subject):
+    secret=os.environ.get("UPLOAD_SIGNING_SECRET","")
+    if len(secret)<32 or not subject:return None
+    blob=json.dumps({"sub":subject,"permission":"files:upload","aud":"mad4b-upload-authz","exp":int(time.time())+45},separators=(",",":"),sort_keys=True).encode()
+    encoded=base64.urlsafe_b64encode(blob).rstrip(b"=").decode()
+    sig=hmac.new(secret.encode(),encoded.encode(),hashlib.sha256).hexdigest()
+    return "Bearer mad4b."+encoded+"."+sig
+
 class Handler(BaseHTTPRequestHandler):
     def respond(self,status,payload):
         raw=json.dumps(payload).encode()
@@ -109,6 +128,11 @@ class Handler(BaseHTTPRequestHandler):
             p=request.get("params") or {};qualified=p.get("name")
             if qualified not in routes:return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"isError":True,"content":[{"type":"text","text":"unknown_tool"}]}})
             url,name,forward_auth=routes[qualified]
+            if qualified.startswith("upload__"):
+                subject=verified_proxy_subject(self)
+                forward_auth=grant_upload_subject(subject)
+                if not forward_auth:
+                    return self.respond(403,{"error":"upload_permission_required"})
             result=call_provider(url,{"jsonrpc":"2.0","id":identifier,"method":"tools/call","params":{"name":name,"arguments":p.get("arguments") or {}}},forward_auth)
             return self.respond(200,result)
         except urllib.error.HTTPError as exc:
