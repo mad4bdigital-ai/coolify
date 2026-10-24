@@ -55,8 +55,8 @@ services:
       UPLOAD_MAX_BYTES: "33554432"
       UPLOAD_QUARANTINE: /data/quarantine
       UPLOAD_URL_ALLOWED_HOSTS: "${UPLOAD_URL_ALLOWED_HOSTS:-}"
-      UPLOAD_AUTHZ_URL: "${UPLOAD_AUTHZ_URL:-}"
-      UPLOAD_AUTHORIZATION_MODE: "oauth_login"
+      UPLOAD_AUTHZ_URL: "http://upload-authz:8080/v1/authorize"
+      UPLOAD_AUTHORIZATION_MODE: "strict"
     volumes:
       - upload-quarantine:/data/quarantine
       - /opt/mad4b/uploads/quarantine:/data/server-quarantine
@@ -76,6 +76,28 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,nosuid,nodev,noexec,size=16m
+
+  upload-authz:
+    build:
+      context: ./upload
+      dockerfile: Authz.Dockerfile
+    restart: unless-stopped
+    environment:
+      UPLOAD_INTROSPECT_URL: "${UPLOAD_INTROSPECT_URL:-}"
+      UPLOAD_INTROSPECT_CLIENT_ID: "${UPLOAD_INTROSPECT_CLIENT_ID:-}"
+      UPLOAD_INTROSPECT_CLIENT_SECRET: "${UPLOAD_INTROSPECT_CLIENT_SECRET:-}"
+      UPLOAD_INTROSPECT_ISSUER: "${UPLOAD_INTROSPECT_ISSUER:-}"
+      UPLOAD_INTROSPECT_AUDIENCE: "${UPLOAD_INTROSPECT_AUDIENCE:-}"
+      UPLOAD_ALLOWED_SUBJECTS: "${UPLOAD_ALLOWED_SUBJECTS:-}"
+    expose:
+      - "8080"
+    networks:
+      - default
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
 
   mcp-provider-registry:
     environment:
