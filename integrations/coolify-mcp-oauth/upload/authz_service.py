@@ -80,7 +80,25 @@ def authorize_token(bearer):
     if not isinstance(sub,str) or sub not in ALLOWED_SUBJECTS:return None
     return sub
 
+def authorize_registry_assertion(bearer):
+    secret=os.environ.get("UPLOAD_SIGNING_SECRET","")
+    if len(secret)<32 or not bearer.startswith("Bearer mad4b.") or len(bearer)>4096:return None
+    try:
+        encoded,signature=bearer[13:].split(".",1)
+        if len(signature)!=64 or not hmac.compare_digest(hmac.new(secret.encode(),encoded.encode(),hashlib.sha256).hexdigest(),signature):return None
+        data=json.loads(base64.urlsafe_b64decode(encoded+"="*((-len(encoded))%4)))
+        now=__import__("time").time()
+        sub=data.get("sub")
+        if data.get("aud")!="mad4b-upload-authz" or data.get("permission")!="files:upload":return None
+        if type(data.get("exp")) is not int or not now<data["exp"]<=now+60:return None
+        if not isinstance(sub,str) or sub not in ALLOWED_SUBJECTS:return None
+        return sub
+    except (ValueError,TypeError,KeyError,UnicodeDecodeError):return None
+
 def readiness():
+    if AUTHORIZATION_BACKEND=="registry_assertion":
+        ok=len(os.environ.get("UPLOAD_SIGNING_SECRET",""))>=32 and bool(ALLOWED_SUBJECTS)
+        return {"ready":ok,"missing":[] if ok else ["signing_secret_or_allowed_subjects"]}
     if AUTHORIZATION_BACKEND=="oauth_fingerprint":
         valid=bool(ALLOWED_TOKEN_DIGESTS) and all(len(x)==64 and all(c in "0123456789abcdef" for c in x) for x in ALLOWED_TOKEN_DIGESTS)
         return {"ready":valid,"missing":[] if valid else ["allowed_token_sha256"]}
@@ -109,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
         try:body=json.loads(self.rfile.read(int(size)))
         except (ValueError,UnicodeDecodeError):return self.reply(400,{"error":"invalid_request"})
         if body!={"permission":"files:upload"}:return self.reply(403,{"allowed":False})
-        subject=(authorize_oauth_fingerprint(self.headers.get("Authorization","")) if AUTHORIZATION_BACKEND=="oauth_fingerprint" else authorize_token(self.headers.get("Authorization","")) if AUTHORIZATION_BACKEND=="introspection" else None)
+        subject=(authorize_registry_assertion(self.headers.get("Authorization","")) if AUTHORIZATION_BACKEND=="registry_assertion" else authorize_oauth_fingerprint(self.headers.get("Authorization","")) if AUTHORIZATION_BACKEND=="oauth_fingerprint" else authorize_token(self.headers.get("Authorization","")) if AUTHORIZATION_BACKEND=="introspection" else None)
         if not subject:return self.reply(403,{"allowed":False})
         return self.reply(200,{"allowed":True,"permission":"files:upload","sub":subject})
 if __name__=="__main__":
