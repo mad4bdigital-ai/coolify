@@ -28,10 +28,29 @@ def verify_client_token(bearer):
     except (ValueError,KeyError,OSError,urllib.error.URLError):
         return False
 
-def discover(token):
+def authorize_identity(bearer):
+    """Classify credentials without elevating one provider's privileges."""
+    if verify_client_token(bearer):
+        return "upload_oauth"
+    core=PROVIDERS.get("coolify")
+    if core is None:
+        return None
+    try:
+        answer=call_provider(core["url"],{"jsonrpc":"2.0","id":"core-auth","method":"tools/list","params":{}},bearer)
+        if isinstance(answer.get("result",{}).get("tools"),list):
+            return "coolify"
+    except (ValueError,KeyError,OSError,urllib.error.URLError):
+        pass
+    return None
+
+def discover(token,identity=None):
     tools=[];routes={}
     for provider,config in PROVIDERS.items():
-        effective_token=config.get("authorization",token)
+        if identity=="upload_oauth" and provider=="coolify":
+            continue
+        if identity=="coolify" and provider=="upload":
+            continue
+        effective_token=token if identity=="coolify" and provider=="coolify" else config.get("authorization",token)
         try:
             answer=call_provider(config["url"],{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
         except urllib.error.HTTPError as exc:
@@ -62,13 +81,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.path!="/mcp":return self.respond(404,{"error":"not_found"})
         auth=self.headers.get("Authorization","")
         if not auth.startswith("Bearer ") or len(auth)>8192:return self.respond(401,{"error":"authentication_required"})
-        if not verify_client_token(auth):return self.respond(401,{"error":"invalid_oauth_session"})
+        identity=authorize_identity(auth)
+        if identity is None:return self.respond(401,{"error":"invalid_authorization"})
         length=self.headers.get("Content-Length","")
         if not length.isdecimal() or int(length)>1024*1024:return self.respond(413,{"error":"request_too_large"})
         try:
             request=json.loads(self.rfile.read(int(length)));method=request.get("method");identifier=request.get("id")
             if method=="initialize":return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"mad4b-provider-registry","version":"0.1.0"}}})
-            tools,routes=discover(auth)
+            tools,routes=discover(auth,identity)
             if method=="tools/list":return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"tools":tools}})
             if method!="tools/call":return self.respond(400,{"error":"unsupported_method"})
             p=request.get("params") or {};qualified=p.get("name")
