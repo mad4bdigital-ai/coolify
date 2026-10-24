@@ -48,6 +48,7 @@ services:
       UPLOAD_AUTHORIZATION_MODE: "oauth_login"
     volumes:
       - upload-quarantine:/data/quarantine
+      - /opt/mad4b/uploads/quarantine:/data/server-quarantine
     expose:
       - "8080"
     networks:
