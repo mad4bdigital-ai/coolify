@@ -130,6 +130,11 @@ class Handler(BaseHTTPRequestHandler):
             url,name,forward_auth=routes[qualified]
             if qualified.startswith("upload__"):
                 subject=verified_proxy_subject(self)
+                # A native Coolify bearer is sufficient ONLY after authorize_identity
+                # has confirmed that the native Coolify MCP accepts that bearer.
+                # Do not expose or persist the bearer in the upload principal.
+                if subject is None and identity=="coolify":
+                    subject="coolify:"+hashlib.sha256(auth.encode()).hexdigest()
                 forward_auth=grant_upload_subject(subject)
                 if not forward_auth:
                     return self.respond(403,{"error":"upload_permission_required"})
