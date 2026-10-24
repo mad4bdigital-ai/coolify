@@ -30,22 +30,29 @@ def inspect(root,ident,owner=None):
     if real!=data["offset"]:raise ValueError("transfer_state_conflict")
     return data,meta,part
 def append(root,payload):
-    ident=payload.get("transfer_id");data,meta,part=inspect(root,ident,payload.get("owner"))
-    offset=payload.get("offset")
-    if type(offset)!=int or offset!=data["offset"]:raise ValueError("offset_conflict")
+    ident=payload.get("transfer_id")
     encoded=payload.get("base64")
     if not isinstance(encoded,str) or len(encoded)>700000:raise ValueError("chunk_too_large")
     try:chunk=base64.b64decode(encoded,validate=True)
     except (binascii.Error,ValueError):raise ValueError("invalid_base64")
-    if not chunk or len(chunk)>CHUNK_MAX or offset+len(chunk)>data["size"]:raise ValueError("invalid_chunk_size")
-    # Exclusive append position. A conflicting concurrent writer must fail closed.
+    if not chunk or len(chunk)>CHUNK_MAX:raise ValueError("invalid_chunk_size")
+    meta,part=paths(root,ident)
     with open(part,"r+b",buffering=0) as f:
         fcntl.flock(f.fileno(),fcntl.LOCK_EX)
-        if f.seek(0,os.SEEK_END)!=offset:raise ValueError("offset_conflict")
-        f.write(chunk);os.fsync(f.fileno())
-    data["offset"]+=len(chunk)
-    tmp=meta.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data));os.chmod(tmp,0o600);os.replace(tmp,meta)
+        data,_,_=inspect(root,ident,payload.get("owner"))
+        offset=payload.get("offset")
+        if type(offset)!=int or offset!=data["offset"] or f.seek(0,os.SEEK_END)!=offset:raise ValueError("offset_conflict")
+        if offset+len(chunk)>data["size"]:raise ValueError("invalid_chunk_size")
+        f.write(chunk)
+        os.fsync(f.fileno())
+        data["offset"]=offset+len(chunk)
+        tmp=meta.with_name(meta.name+"."+secrets.token_hex(8)+".tmp")
+        try:
+            tmp.write_text(json.dumps(data))
+            os.chmod(tmp,0o600)
+            os.replace(tmp,meta)
+        finally:
+            if tmp.exists():tmp.unlink()
     return {"transfer_id":ident,"offset":data["offset"],"size":data["size"]}
 def status(root,payload):
     data,_,_=inspect(root,payload.get("transfer_id"),payload.get("owner"))
