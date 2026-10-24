@@ -46,8 +46,6 @@ def authorize_identity(bearer):
 def discover(token,identity=None):
     tools=[];routes={}
     for provider,config in PROVIDERS.items():
-        if identity=="coolify" and provider=="upload":
-            continue
         if provider=="coolify" and identity=="upload_oauth":
             effective_url="http://coolify-mcp-oauth:8080/mcp"
             effective_token=token
@@ -55,7 +53,12 @@ def discover(token,identity=None):
             effective_url=config["url"]
             effective_token=token if identity=="coolify" and provider=="coolify" else config.get("authorization",token)
         try:
-            answer=call_provider(effective_url,{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
+            if provider=="upload" and identity=="coolify":
+                # Discover tool schemas, never grant upload rights based on Coolify login.
+                with urllib.request.urlopen("http://public-file-upload:8080/internal/tool-catalog",timeout=4) as response:
+                    answer={"result":{"tools":json.loads(response.read(131072)).get("tools",[])}}
+            else:
+                answer=call_provider(effective_url,{"jsonrpc":"2.0","id":"registry","method":"tools/list","params":{}},effective_token)
         except urllib.error.HTTPError as exc:
             # An unavailable optional provider must not hide the core Coolify catalog.
             # A denied Upload bearer must never be promoted into Upload authority.
