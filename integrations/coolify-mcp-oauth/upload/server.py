@@ -13,6 +13,7 @@ import time
 import urllib.request
 import urllib.error
 import transfer
+import url_import
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_BYTES=int(os.environ.get("UPLOAD_MAX_BYTES",str(32*1024*1024)))
@@ -108,6 +109,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=="/mcp-upload":return self.reply(200,{"jsonrpc":"2.0","id":mid,"result":{"isError":True,"content":[{"type":"text","text":str(exc)}]}})
             return self.reply(422,{"error":str(exc)})
     def do_POST(self):
+        if self.path=="/v1/import-url":
+            if not self.oauth_authorized():return self.reply(401,{"error":"oauth_required"})
+            data=self.body_json()
+            if not isinstance(data,dict):return self.reply(400,{"error":"invalid_payload"})
+            hosts={h.strip().lower() for h in os.environ.get("UPLOAD_URL_ALLOWED_HOSTS","").split(",") if h.strip()}
+            try:
+                result=url_import.import_url(TARGET,data.get("url",""),data.get("sha256",""),MAX_BYTES,hosts)
+                return self.reply(201,result)
+            except (ValueError,OSError,TimeoutError) as exc:
+                return self.reply(422,{"error":str(exc)})
         if self.path=="/mcp-upload" or self.path in ("/v1/transfers/begin","/v1/transfers/chunk","/v1/transfers/status","/v1/transfers/commit"):
             return self.transfer_request()
         if self.path=="/v1/grants":
