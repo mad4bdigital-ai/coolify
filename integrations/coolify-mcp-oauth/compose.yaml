@@ -84,7 +84,8 @@ services:
       dockerfile: Authz.Dockerfile
     restart: unless-stopped
     environment:
-      UPLOAD_AUTHZ_BACKEND: "oauth_fingerprint"
+      UPLOAD_AUTHZ_BACKEND: "registry_assertion"
+      UPLOAD_SIGNING_SECRET: "${UPLOAD_SIGNING_SECRET:?Internal signing secret required}"
       UPLOAD_ALLOWED_TOKEN_SHA256: "${UPLOAD_ALLOWED_TOKEN_SHA256:-}"
       UPLOAD_INTROSPECT_URL: "${UPLOAD_INTROSPECT_URL:-}"
       UPLOAD_INTROSPECT_CLIENT_ID: "${UPLOAD_INTROSPECT_CLIENT_ID:-}"
@@ -104,6 +105,7 @@ services:
 
   mcp-provider-registry:
     environment:
+      UPLOAD_SIGNING_SECRET: "${UPLOAD_SIGNING_SECRET:?Internal signing secret required}"
       COOLIFY_SOURCE_MCP_URL: "http://coolify:8080/mcp"
       COOLIFY_SOURCE_AUTHORIZATION: "${UPSTREAM_AUTHORIZATION_HEADER:?Existing Coolify bearer required}"
     labels:
