@@ -94,6 +94,14 @@ class Handler(BaseHTTPRequestHandler):
             name=(request.get("params") or {}).get("name") if isinstance(request,dict) else None
             if size>1024*1024 and not (method=="tools/call" and name in ("upload__upload_attachment","upload__upload_file")):
                 return self.respond(413,{"error":"request_too_large"})
+            if method=="server/discover":
+                result={"resultType":"complete","supportedVersions":["2026-07-28"],"capabilities":{"tools":{}},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"mad4b-provider-registry","version":"0.1.0"}}}
+                return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":result})
+            if method=="notifications/initialized":
+                self.send_response(202)
+                self.send_header("Content-Length","0")
+                self.end_headers()
+                return
             if method=="initialize":return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"mad4b-provider-registry","version":"0.1.0"}}})
             tools,routes=discover(auth,identity)
             if method=="tools/list":return self.respond(200,{"jsonrpc":"2.0","id":identifier,"result":{"tools":tools}})
