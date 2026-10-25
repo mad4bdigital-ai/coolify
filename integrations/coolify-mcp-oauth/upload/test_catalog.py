@@ -29,6 +29,15 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("nor installed",description)
         self.assertEqual(tool["inputSchema"]["required"],["url","sha256"])
         self.assertIn("do not guess",tool["inputSchema"]["properties"]["sha256"]["description"])
+    def test_attachment_requires_real_transport_exclusively(self):
+        spec=next(x for x in catalog.list_tools() if x["name"]=="upload_attachment")
+        schema=spec["inputSchema"]
+        self.assertIn("oneOf",schema)
+        self.assertEqual(len(schema["oneOf"]),2)
+        self.assertIn("url",schema["properties"])
+        self.assertIn("content_base64",schema["properties"])
+        self.assertNotIn("file_id",schema["properties"])
+        self.assertNotIn("file_uri",schema["properties"])
     def test_no_unavailable_reference_bridge_advertised(self):
         names={x["name"] for x in catalog.list_tools()}
         self.assertNotIn("upload_from_reference",names)
