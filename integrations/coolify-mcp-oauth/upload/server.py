@@ -92,7 +92,9 @@ class Handler(BaseHTTPRequestHandler):
             inputs=dict(inputs)
             inputs["owner"]=principal
             if operation=="upload_attachment":
-                operation="upload_file"
+                if ("url" in inputs) == ("content_base64" in inputs):
+                    raise ValueError("attachment_payload_required")
+                operation="upload_from_url" if "url" in inputs else "upload_file"
             if operation=="upload_server_file":
                 result=server_storage.promote(TARGET,Path("/data/server-quarantine"),inputs.get("sha256"),inputs.get("filename"),MAX_BYTES)
             elif operation=="upload_from_url":
