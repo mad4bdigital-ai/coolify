@@ -16,7 +16,6 @@ import transfer
 import url_import
 import authorization
 import server_storage
-import reference_import
 import catalog
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -96,10 +95,6 @@ class Handler(BaseHTTPRequestHandler):
                 operation="upload_file"
             if operation=="upload_server_file":
                 result=server_storage.promote(TARGET,Path("/data/server-quarantine"),inputs.get("sha256"),inputs.get("filename"),MAX_BYTES)
-            elif operation=="upload_from_reference":
-                result=reference_import.import_reference(
-                    Path(os.environ.get("UPLOAD_REFERENCE_INBOX","/data/attachment-inbox")),
-                    TARGET,inputs.get("reference"),principal,inputs.get("sha256"),MAX_BYTES)
             elif operation=="upload_from_url":
                 hosts={h.strip().lower() for h in os.environ.get("UPLOAD_URL_ALLOWED_HOSTS","").split(",") if h.strip()}
                 result=url_import.import_url(TARGET,inputs.get("url",""),inputs.get("sha256",""),MAX_BYTES,hosts)
