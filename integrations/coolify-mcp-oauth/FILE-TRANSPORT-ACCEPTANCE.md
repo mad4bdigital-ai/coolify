@@ -44,3 +44,11 @@ The checked-in `upload/attachment_transport_client.py` provides both paths throu
    The service accepts only the operator's exact `UPLOAD_URL_ALLOWED_HOSTS`; its URL importer pins public DNS resolution, refuses redirects and verifies full SHA-256. Private attachment URLs must not be assumed reachable or permitted.
 
 Both methods return **quarantined**, never installed or delivered to VPS. A later authenticated `upload_server_file` promotion and independent VPS hash readback are required. Do not put tokens or signed URLs in CI logs, shell history or issue comments. OAuth permission `files:upload` must be actually enforced before enabling either route.
+
+## Trusted host-issued attachment references — source integration
+
+The MCP sidecar now declares `upload_from_reference(reference, sha256)`. This is an **opaque, pre-staged reference** and is not a native ChatGPT file-ID resolver. The reference consists of 32 lowercase hexadecimal characters. The trusted host-side attachment bridge must first place `<reference>.bin` and `<reference>.json` under the read-only inbox mounted from `/opt/mad4b/uploads/attachment-inbox`. A manifest must contain `principal` (the exact identity returned by the verified upload authorization service), `sha256`, and `status: authorized`. Never allow the MCP caller to choose a server path or modify the principal.
+
+The receiving service validates exact principal, grant state, digest, size bound and symlink denial before moving verified bytes to quarantine. Success is `quarantined`, **not** VPS promotion or plugin installation. The inbox must be independently provisioned by an authorized host bridge, have restrictive filesystem permissions, and be readable by the upload container's unprivileged user. The host bridge must not expose raw ChatGPT attachment URLs or accept untrusted user-submitted filesystem paths.
+
+**Deployment acceptance:** verify host-side issuance, a real ChatGPT attachment transfer, negative cross-user tests, actual tool discovery after connector refresh, SHA-256 VPS readback, and the separate Lab installation receipt. Source tests alone do not certify these steps. Where the host does not supply attachment bytes or a trusted reference-issuance capability, report `bridge_unavailable` rather than treating a ChatGPT file ID as a valid reference.
