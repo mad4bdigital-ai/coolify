@@ -1,5 +1,8 @@
 # File transports — acceptance matrix (24 October 2026)
 
+> **Current verified status (25 October 2026):** See [TRANSFER-VERIFIED-OPERATIONS-2026-10-25.md](./TRANSFER-VERIFIED-OPERATIONS-2026-10-25.md) for the live tested acceptance matrix, current runbook, and open gates. Earlier deployment assumptions and acceptance wording in this document are historical where they conflict with that report.
+
+
 This feature branch contains the following capabilities in the existing OAuth application Compose stack. All files go to isolated quarantine, not to WordPress paths.
 
 | Mode | Implementation | Test / remaining condition |
