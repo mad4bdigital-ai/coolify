@@ -29,6 +29,11 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("nor installed",description)
         self.assertEqual(tool["inputSchema"]["required"],["url","sha256"])
         self.assertIn("do not guess",tool["inputSchema"]["properties"]["sha256"]["description"])
+    def test_no_unavailable_reference_bridge_advertised(self):
+        names={x["name"] for x in catalog.list_tools()}
+        self.assertNotIn("upload_from_reference",names)
+        self.assertIn("upload_from_url",names)
+        self.assertIn("upload_file",names)
     def test_unknown_rejected(self):
         self.assertFalse(catalog.supported("../unsafe"))
 if __name__=="__main__":unittest.main()
