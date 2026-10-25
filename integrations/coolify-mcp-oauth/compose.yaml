@@ -50,7 +50,6 @@ services:
     labels:
       - 'traefik.enable=true'
       - 'traefik.docker.network=coolify'
-      - 'traefik.docker.network=coolify'
       - 'traefik.http.routers.mad4b-upload-api.rule=Host(`coolify-mcp.infra.mad4b.com`) && PathPrefix(`/upload/v1/`)'
       - 'traefik.http.routers.mad4b-upload-api.entrypoints=https'
       - 'traefik.http.routers.mad4b-upload-api.priority=150'
@@ -124,6 +123,7 @@ services:
       COOLIFY_SOURCE_MCP_URL: "http://coolify:8080/mcp"
       COOLIFY_SOURCE_AUTHORIZATION: "${UPSTREAM_AUTHORIZATION_HEADER:?Existing Coolify bearer required}"
     labels:
+      - 'traefik.docker.network=coolify'
       - 'traefik.enable=true'
       - 'traefik.http.routers.mad4b-registry.rule=Host(`coolify-mcp.infra.mad4b.com`) && Path(`/upload/mcp`)'
       - 'traefik.http.routers.mad4b-primary-mcp.rule=Host(`coolify.infra.mad4b.com`) && Path(`/mcp`)'
