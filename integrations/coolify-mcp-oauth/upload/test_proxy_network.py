@@ -1,12 +1,14 @@
 """Regression guard: Traefik must use a network shared with the public proxy."""
 from pathlib import Path
+import re
 import unittest
 
 COMPOSE = (Path(__file__).resolve().parents[1] / "compose.yaml").read_text()
 
 def section(name):
     start=COMPOSE.index("\n  "+name+":\n")
-    end=COMPOSE.find("\n  ",start+4)
+    match=re.search(r"(?m)^  [a-z][a-z0-9-]+:$",COMPOSE[start+4:])
+    end=start+4+match.start() if match else -1
     return COMPOSE[start:] if end<0 else COMPOSE[start:end]
 
 class ProxyNetworkTests(unittest.TestCase):
