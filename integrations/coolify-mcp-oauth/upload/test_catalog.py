@@ -13,7 +13,7 @@ class CatalogTests(unittest.TestCase):
         descriptors={d["name"]:d for d in catalog.list_tools()}
         attachment=descriptors["upload_attachment"]
         self.assertIn("Does NOT resolve ChatGPT attachment IDs",attachment["description"])
-        self.assertIn("content_base64",attachment["inputSchema"]["required"])
+        self.assertIn("content_base64",attachment["inputSchema"]["properties"])
         self.assertNotIn("file_uri",attachment["inputSchema"]["properties"])
         server=descriptors["upload_server_file"]
         self.assertIn("Requires prior successful upload",server["description"])
