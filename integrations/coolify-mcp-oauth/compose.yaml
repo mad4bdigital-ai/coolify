@@ -16,6 +16,8 @@ services:
     depends_on:
       oauth-redis:
         condition: service_healthy
+      mcp-provider-registry:
+        condition: service_healthy
     environment:
       PROD_MODE: "true"
       OIDC_ISSUER_URL: "https://accounts.google.com"
