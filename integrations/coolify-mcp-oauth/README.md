@@ -1,5 +1,8 @@
 # Coolify → ChatGPT MCP OAuth bridge (staging only)
 
+> **Current verified status (25 October 2026):** See [TRANSFER-VERIFIED-OPERATIONS-2026-10-25.md](./TRANSFER-VERIFIED-OPERATIONS-2026-10-25.md) for the live tested acceptance matrix, current runbook, and open gates. Earlier deployment assumptions and acceptance wording in this document are historical where they conflict with that report.
+
+
 This directory provides a *deployment template*, **not a forked implementation** of OAuth. It uses [babs/mcp-auth-proxy release v2.1.0](https://github.com/babs/mcp-auth-proxy/releases/tag/v2.1.0) (Apache-2.0) with its documented fixed `UPSTREAM_AUTHORIZATION_HEADER` option. Upstream source tag resolves to `b0062463c4810a21aed62237253c837d4801aa8f`. Verify the published image digest/signature before deploying; no digest has been independently attested by this repo.
 
 ## Preconditions
