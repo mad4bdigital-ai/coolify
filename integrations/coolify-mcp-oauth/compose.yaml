@@ -1,5 +1,14 @@
 services:
   coolify-mcp-oauth:
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.mad4b-oauth-mcp.rule=Host(`coolify-mcp.infra.mad4b.com`) && PathPrefix(`/mcp`)'
+      - 'traefik.http.routers.mad4b-oauth-mcp.entrypoints=https'
+      - 'traefik.http.routers.mad4b-oauth-mcp.priority=200'
+      - 'traefik.http.routers.mad4b-oauth-mcp.tls=true'
+      - 'traefik.http.routers.mad4b-oauth-mcp.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-oauth-mcp.service=mad4b-oauth-mcp'
+      - 'traefik.http.services.mad4b-oauth-mcp.loadbalancer.server.port=8080'
     build:
       context: .
       dockerfile: Dockerfile
