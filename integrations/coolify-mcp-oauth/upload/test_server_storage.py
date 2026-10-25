@@ -8,6 +8,23 @@ class ServerStorageTests(unittest.TestCase):
     def test_verified_file_promoted(self):
         out=promote(self.src,self.dst,self.sha,"jet-woo-builder-2.3.5.zip",1024)
         self.assertEqual(out["state"],"stored_on_vps");self.assertEqual((self.dst/"jet-woo-builder-2.3.5.zip").read_bytes(),self.blob)
+    def test_retry_returns_verified_receipt(self):
+        first=promote(self.src,self.dst,self.sha,"package.zip",1024)
+        second=promote(self.src,self.dst,self.sha,"package.zip",1024)
+        self.assertTrue(first["verified"])
+        self.assertFalse(first["already_present"])
+        self.assertTrue(second["already_present"])
+        self.assertEqual(second["sha256"],self.sha)
+    def test_conflicting_destination_not_replaced(self):
+        destination=self.dst/"package.zip"
+        destination.write_bytes(b"different artifact")
+        with self.assertRaisesRegex(ValueError,"destination_conflict"):
+            promote(self.src,self.dst,self.sha,"package.zip",1024)
+        self.assertEqual(destination.read_bytes(),b"different artifact")
+    def test_recovery_receipt_after_source_removed(self):
+        promote(self.src,self.dst,self.sha,"package.zip",1024)
+        (self.src/(self.sha+".bin")).unlink()
+        self.assertTrue(promote(self.src,self.dst,self.sha,"package.zip",1024)["already_present"])
     def test_traversal_rejected(self):
         with self.assertRaisesRegex(ValueError,"invalid_filename"):
             promote(self.src,self.dst,self.sha,"../config.php",1024)
