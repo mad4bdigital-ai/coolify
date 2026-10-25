@@ -24,7 +24,7 @@ class FunctionalTransferTests(unittest.TestCase):
     def test_attachment_tool_is_in_catalog(self):
         tools={tool["name"]:tool for tool in catalog.list_tools()}
         self.assertIn("upload_attachment",tools)
-        self.assertEqual(set(tools["upload_attachment"]["inputSchema"]["required"]),{"content_base64","sha256","filename"})
+        self.assertEqual(set(tools["upload_attachment"]["inputSchema"]["required"]),{"sha256","filename"})\n        self.assertEqual(len(tools["upload_attachment"]["inputSchema"]["oneOf"]),2)
         self.assertTrue(catalog.supported("upload_attachment"))
     def test_tampered_bytes_are_not_saved(self):
         with tempfile.TemporaryDirectory() as temp:
