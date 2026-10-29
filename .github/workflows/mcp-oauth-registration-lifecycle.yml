@@ -1,0 +1,40 @@
+name: MCP OAuth registration lifecycle
+on:
+  pull_request:
+    branches:
+      - feat/hostinger-root-shell-mcp
+      - feat/chatgpt-mcp-oauth
+    paths:
+      - 'integrations/hostinger-root-shell-mcp/**'
+      - 'integrations/coolify-mcp-oauth/**'
+      - '.github/workflows/mcp-oauth-registration-lifecycle.yml'
+  push:
+    branches:
+      - feat/hostinger-root-shell-mcp
+      - feat/chatgpt-mcp-oauth
+    paths:
+      - 'integrations/hostinger-root-shell-mcp/**'
+      - 'integrations/coolify-mcp-oauth/**'
+      - '.github/workflows/mcp-oauth-registration-lifecycle.yml'
+permissions:
+  contents: read
+jobs:
+  oauth-registration-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check selected integrations' OAuth configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          tested=0
+          for dir in integrations/hostinger-root-shell-mcp integrations/coolify-mcp-oauth; do
+            if [[ -f "$dir/tests/test_oauth_registration_config.py" ]]; then
+              python -m unittest discover -s "$dir/tests" -p 'test_oauth_registration_config.py' -v
+              tested=$((tested + 1))
+            fi
+          done
+          test "$tested" -ge 1
