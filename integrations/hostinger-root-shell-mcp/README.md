@@ -57,3 +57,32 @@ The application lists keys only from the operator-approved host directory mounte
 - The account behind Google OAuth controls access to this MCP endpoint; for unrestricted Root execution, Google sign-in must be restricted to the explicitly approved operator(s). The shell code contains no separate account registry.
 
 **Do not mount a broad SSH folder containing unrelated credentials.** Create a dedicated directory containing only the specific existing key files authorized for this service. Key paths remain on the VPS, never in GitHub.
+
+## ChatGPT MCP registration lifecycle (owner-approved)
+
+The `shell-oauth` service explicitly sets `CLIENT_REGISTRATION_TTL: "0"` for
+`ghcr.io/babs/mcp-auth-proxy:2.1.0`. In this image **0 disables expiry for
+newly issued, sealed Dynamic Client Registration (`client_id`) records**.
+This prevents the seven-day `invalid_client / client_registration_expired`
+failure with clients that do not automatically re-register. It does **not**
+extend OAuth access tokens, refresh tokens, OIDC sessions, or SSH credentials.
+
+Security trade-off: a non-expiring registration removes the client-id reuse
+window bound. Keep `PROD_MODE=true`, mandatory Google OIDC, owner-identity
+restrictions, signing key custody, replay protection, and private upstream
+network isolation. Never commit or rotate `TOKEN_SIGNING_SECRET` during this
+configuration-only change.
+
+**Existing expired `client_id` values remain expired.** After a controlled
+deployment of the source Compose through Coolify, reconnect affected ChatGPT
+MCP apps to issue fresh registrations. Verify runtime has
+`CLIENT_REGISTRATION_TTL=0`, then test OAuth sign-in and `tools/list`
+through the domain. Keep a rollback copy of the previous Compose and avoid
+recreating the Redis or SSH services. Rolling back to the image default will
+restore seven-day expiry **only for newly issued registrations**; use an
+explicit key-revocation procedure for compromised registrations.
+
+This integration config covers the shell proxy used for Registry and Shell
+MCP applications when both are deployed from this source file. The separate
+`coolify-mcp-oauth` service has a different source/image and is not changed
+by this setting.
