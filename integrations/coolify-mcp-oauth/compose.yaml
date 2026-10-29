@@ -21,6 +21,9 @@ services:
         condition: service_healthy
     environment:
       PROD_MODE: "true"
+      # Preserve newly issued MCP Dynamic Client Registrations indefinitely.
+      # Access/refresh tokens and Google OIDC authorization remain unchanged.
+      CLIENT_REGISTRATION_TTL: "0"
       OIDC_ISSUER_URL: "https://accounts.google.com"
       OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:?Google OAuth web client ID required}"
       OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:?Google OAuth web client secret required}"
