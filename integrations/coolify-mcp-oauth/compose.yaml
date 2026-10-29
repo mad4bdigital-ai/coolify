@@ -1,0 +1,192 @@
+services:
+  coolify-mcp-oauth:
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=coolify'
+      - 'traefik.http.routers.mad4b-oauth-mcp.rule=Host(`coolify-mcp.infra.mad4b.com`) && PathPrefix(`/`)'
+      - 'traefik.http.routers.mad4b-oauth-mcp.entrypoints=https'
+      - 'traefik.http.routers.mad4b-oauth-mcp.priority=100'
+      - 'traefik.http.routers.mad4b-oauth-mcp.tls=true'
+      - 'traefik.http.routers.mad4b-oauth-mcp.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-oauth-mcp.service=mad4b-oauth-mcp'
+      - 'traefik.http.services.mad4b-oauth-mcp.loadbalancer.server.port=8080'
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      oauth-redis:
+        condition: service_healthy
+      mcp-provider-registry:
+        condition: service_healthy
+    environment:
+      PROD_MODE: "true"
+      # Preserve newly issued MCP Dynamic Client Registrations indefinitely.
+      # Access/refresh tokens and Google OIDC authorization remain unchanged.
+      CLIENT_REGISTRATION_TTL: "0"
+      OIDC_ISSUER_URL: "https://accounts.google.com"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:?Google OAuth web client ID required}"
+      OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:?Google OAuth web client secret required}"
+      PROXY_BASE_URL: "${PROXY_BASE_URL:?Dedicated HTTPS adapter URL required}"
+      UPSTREAM_MCP_URL: "http://mcp-provider-registry:8080/mcp"
+      UPSTREAM_AUTHORIZATION_HEADER: "${UPSTREAM_AUTHORIZATION_HEADER:?Read-only Coolify Bearer required}"
+      TOKEN_SIGNING_SECRET: "${TOKEN_SIGNING_SECRET:?Unique strong signing key required}"
+      REDIS_URL: "redis://oauth-redis:6379/0"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - default
+      - oauth-state
+      - coolify-internal
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  public-file-upload:
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=coolify'
+      - 'traefik.http.routers.mad4b-upload-api.rule=Host(`coolify-mcp.infra.mad4b.com`) && PathPrefix(`/upload/v1/`)'
+      - 'traefik.http.routers.mad4b-upload-api.entrypoints=https'
+      - 'traefik.http.routers.mad4b-upload-api.priority=150'
+      - 'traefik.http.routers.mad4b-upload-api.tls=true'
+      - 'traefik.http.routers.mad4b-upload-api.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-upload-api.middlewares=mad4b-upload-api-strip'
+      - 'traefik.http.middlewares.mad4b-upload-api-strip.stripprefix.prefixes=/upload'
+      - 'traefik.http.services.mad4b-upload-api.loadbalancer.server.port=8080'
+      - 'traefik.http.routers.mad4b-upload-api.service=mad4b-upload-api'
+    build:
+      context: ./upload
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      UPLOAD_SIGNING_SECRET: "${UPLOAD_SIGNING_SECRET:?Internal signing secret required}"
+      UPLOAD_OAUTH_VERIFY_URL: "http://coolify-mcp-oauth:8080/mcp"
+      UPLOAD_MAX_BYTES: "33554432"
+      UPLOAD_QUARANTINE: /data/quarantine
+      UPLOAD_URL_ALLOWED_HOSTS: "${UPLOAD_URL_ALLOWED_HOSTS:-}"
+      UPLOAD_AUTHZ_URL: "http://upload-authz:8080/v1/authorize"
+      UPLOAD_AUTHORIZATION_MODE: "strict"
+    volumes:
+      - upload-quarantine:/data/quarantine
+      - /opt/mad4b/uploads/quarantine:/data/server-quarantine
+    expose:
+      - "8080"
+    networks:
+      - default
+      - coolify-internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
+
+  upload-authz:
+    build:
+      context: ./upload
+      dockerfile: Authz.Dockerfile
+    restart: unless-stopped
+    environment:
+      UPLOAD_AUTHZ_BACKEND: "registry_assertion"
+      UPLOAD_SIGNING_SECRET: "${UPLOAD_SIGNING_SECRET:?Internal signing secret required}"
+      UPLOAD_ALLOWED_TOKEN_SHA256: "${UPLOAD_ALLOWED_TOKEN_SHA256:-}"
+      UPLOAD_INTROSPECT_URL: "${UPLOAD_INTROSPECT_URL:-}"
+      UPLOAD_INTROSPECT_CLIENT_ID: "${UPLOAD_INTROSPECT_CLIENT_ID:-}"
+      UPLOAD_INTROSPECT_CLIENT_SECRET: "${UPLOAD_INTROSPECT_CLIENT_SECRET:-}"
+      UPLOAD_INTROSPECT_ISSUER: "${UPLOAD_INTROSPECT_ISSUER:-}"
+      UPLOAD_INTROSPECT_AUDIENCE: "${UPLOAD_INTROSPECT_AUDIENCE:-}"
+      UPLOAD_ALLOWED_SUBJECTS: "${UPLOAD_ALLOWED_SUBJECTS:-}"
+    expose:
+      - "8080"
+    networks:
+      - default
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+
+  mcp-provider-registry:
+    environment:
+      UPLOAD_SIGNING_SECRET: "${UPLOAD_SIGNING_SECRET:?Internal signing secret required}"
+      COOLIFY_SOURCE_MCP_URL: "http://coolify:8080/mcp"
+      COOLIFY_SOURCE_AUTHORIZATION: "${UPSTREAM_AUTHORIZATION_HEADER:?Existing Coolify bearer required}"
+    labels:
+      - 'traefik.docker.network=coolify'
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.mad4b-registry.rule=Host(`coolify-mcp.infra.mad4b.com`) && Path(`/upload/mcp`)'
+      - 'traefik.http.routers.mad4b-primary-mcp.rule=Host(`coolify.infra.mad4b.com`) && Path(`/mcp`)'
+      - 'traefik.http.routers.mad4b-primary-mcp.entrypoints=https'
+      - 'traefik.http.routers.mad4b-primary-mcp.priority=250'
+      - 'traefik.http.routers.mad4b-primary-mcp.tls=true'
+      - 'traefik.http.routers.mad4b-primary-mcp.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-primary-mcp.service=mad4b-registry'
+      - 'traefik.http.routers.mad4b-registry.entrypoints=https'
+      - 'traefik.http.routers.mad4b-registry.priority=160'
+      - 'traefik.http.routers.mad4b-registry.tls=true'
+      - 'traefik.http.routers.mad4b-registry.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.mad4b-registry.middlewares=mad4b-registry-strip'
+      - 'traefik.http.middlewares.mad4b-registry-strip.stripprefix.prefixes=/upload'
+      - 'traefik.http.services.mad4b-registry.loadbalancer.server.port=8080'
+      - 'traefik.http.routers.mad4b-registry.service=mad4b-registry'
+    build:
+      context: ./registry
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - default
+      - coolify-internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/healthz',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+
+  oauth-redis:
+    image: redis:7-alpine
+    user: "redis"
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    expose:
+      - "6379"
+    networks:
+      - oauth-state
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  coolify-internal:
+    external: true
+    name: coolify
+  oauth-state:
+    internal: true
+volumes:
+  upload-quarantine: {}
