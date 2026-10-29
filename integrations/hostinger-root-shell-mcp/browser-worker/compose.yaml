@@ -1,0 +1,21 @@
+services:
+  hpanel-browser-worker:
+    build: .
+    restart: unless-stopped
+    user: "11001:11001"
+    environment:
+      HPANEL_PROFILE_DIR: /browser-profile
+    ports:
+      - "127.0.0.1:13871:13871"
+    volumes:
+      - type: bind
+        source: ${HPANEL_WORKER_PROFILE_DIR:?Dedicated persistent profile required}
+        target: /browser-profile
+        bind:
+          create_host_path: false
+    shm_size: "1gb"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 2g

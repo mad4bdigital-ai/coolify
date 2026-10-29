@@ -24,9 +24,18 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      - /opt/hostinger-shell-mcp/hpanel-tokens:/run/secrets/hostinger-accounts:ro
+      # Prepared per-target identities remain separate from VPS root SSH keys.
+      # Read-only status inspection only: host_keys_candidate is NOT trusted.
+      - type: bind
+        source: "${INFRA_SSH_BINDINGS_SOURCE:-/opt/hostinger-shell-mcp/external-targets}"
+        target: /run/secrets/external-targets
+        read_only: true
+        bind:
+          create_host_path: false
     expose:
       - "8000"
-    networks: [shell-private]
+    networks: [shell-private, default]
     read_only: true
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=16m
@@ -40,6 +49,9 @@ services:
     depends_on: [shell-mcp, oauth-redis]
     environment:
       PROD_MODE: "true"
+      # Non-expiring DCR client_id for long-lived ChatGPT MCP connections.
+      # Does not change access/refresh token lifetimes or the OIDC identity gate.
+      CLIENT_REGISTRATION_TTL: "0"
       OIDC_ISSUER_URL: "https://accounts.google.com"
       OIDC_CLIENT_ID: "${SHELL_OIDC_CLIENT_ID:?Google client ID required}"
       OIDC_CLIENT_SECRET: "${SHELL_OIDC_CLIENT_SECRET:?Google client secret required}"

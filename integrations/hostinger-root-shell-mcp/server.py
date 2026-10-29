@@ -8,6 +8,13 @@ import os
 import shlex
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
+from registry import list_targets
+from ssh_binding import probe_authenticated_ssh
+from providers import check_reachability, check_https_api
+from hostinger_gateway import list_hostinger_accounts, plan_import
+from hostinger_api import binding_status, list_websites, diagnose_read_only_endpoints
+from browser_bridge import query_hpanel_worker
+from browser_extension_bridge import extension_inventory
 
 HOST = os.environ["SHELL_SSH_HOST"]
 PORT = os.environ.get("SHELL_SSH_PORT", "22")
@@ -37,6 +44,77 @@ server = FastMCP(
     stateless_http=True,
     instructions="Root-level shell on the enrolled VPS. All commands run as root via SSH. Commands may change or delete production data. Never claim commands are read-only unless they are.",
 )
+
+@server.tool()
+def list_infrastructure_targets(environment: str = "", kind: str = "") -> dict:
+    """Discover approved inventory entries; no scanning or network access."""
+    try:
+        return list_targets(environment=environment, kind=kind)
+    except (OSError, ValueError) as exc:
+        return {"error": str(exc), "targets": [], "secrets_included": False}
+
+@server.tool()
+async def probe_registered_target(target_id: str, timeout_seconds: int = 5) -> dict:
+    """Check reachability of a registered infrastructure endpoint."""
+    return await check_reachability(target_id, timeout_seconds)
+
+@server.tool()
+async def probe_registered_https(target_id: str) -> dict:
+    """Check HTTPS reachability for registered web endpoints."""
+    return await check_https_api(target_id)
+
+@server.tool()
+async def authenticate_registered_ssh(target_id: str) -> dict:
+    """Verify a pre-enrolled external SSH account with pinned host key.
+
+    Runs a fixed, harmless probe; no caller-controlled remote commands or
+    credential disclosure.
+    """
+    return await probe_authenticated_ssh(target_id)
+
+@server.tool()
+def list_hostinger_hpanel_accounts() -> dict:
+    """List enrolled hPanel account aliases and capability metadata, never tokens."""
+    return list_hostinger_accounts()
+
+@server.tool()
+def plan_hostinger_import(target_id: str, category: str = "websites") -> dict:
+    """Prepare a review-only import route without contacting or changing systems."""
+    return plan_import(target_id, category)
+
+@server.tool()
+def hostinger_account_binding_status() -> dict:
+    """Read per-account credential provisioning status without revealing secrets."""
+    return binding_status()
+
+@server.tool()
+def list_hostinger_websites(target_id: str) -> dict:
+    """Read approved Hostinger hPanel website inventory for an enrolled account."""
+    return list_websites(target_id)
+
+@server.tool()
+def diagnose_hostinger_api_read_only(target_id: str) -> dict:
+    """Test allowlisted GET-only Hostinger endpoints; return status codes only."""
+    return diagnose_read_only_endpoints(target_id)
+
+@server.tool()
+async def browser_read_hpanel_domains() -> dict:
+    """Read domain CANDIDATES from authenticated Chromium's visible hPanel tab.
+
+    Results are unverified candidates, not authoritative website inventory.
+    Never returns cookies, tokens, raw page text or browser storage.
+    """
+    return await extension_inventory()
+
+@server.tool()
+async def browser_session_status() -> dict:
+    """Read hPanel browser session state without accessing tokens or cookies."""
+    return await query_hpanel_worker("session_status")
+
+@server.tool()
+async def browser_list_websites() -> dict:
+    """List websites through optional local read-only hPanel browser worker."""
+    return await query_hpanel_worker("list_websites")
 
 @server.tool()
 def list_ssh_keys() -> dict:

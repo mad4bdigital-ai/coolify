@@ -1,0 +1,43 @@
+{
+  "targets": [
+    {
+      "id": "hostinger-primary",
+      "kind": "ssh",
+      "label": "Hostinger KVM8 primary VPS",
+      "environment": "production",
+      "host": "187.7.76.129",
+      "port": 22,
+      "enabled": true
+    },
+    {
+      "id": "hosting-1",
+      "label": "Cloud Startup",
+      "kind": "ssh",
+      "environment": "production",
+      "host": "147.93.49.130",
+      "port": 65002,
+      "username": "u338416126",
+      "enabled": true
+    },
+    {
+      "id": "hosting-2",
+      "label": "allroyalegypt",
+      "kind": "ssh",
+      "environment": "production",
+      "host": "92.113.28.241",
+      "port": 65002,
+      "username": "u948953904",
+      "enabled": true
+    },
+    {
+      "id": "hosting-3",
+      "label": "egypttourgates.com",
+      "kind": "ssh",
+      "environment": "production",
+      "host": "82.198.227.227",
+      "port": 65002,
+      "username": "u783534439",
+      "enabled": true
+    }
+  ]
+}
