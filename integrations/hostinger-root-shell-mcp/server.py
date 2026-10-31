@@ -10,6 +10,7 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from registry import list_targets
 from ssh_binding import probe_authenticated_ssh
+from remote_transport import remote_exec as scoped_remote_exec, remote_file_transfer as scoped_remote_file_transfer
 from providers import check_reachability, check_https_api
 from hostinger_gateway import list_hostinger_accounts, plan_import
 from hostinger_api import binding_status, list_websites, diagnose_read_only_endpoints
@@ -71,6 +72,25 @@ async def authenticate_registered_ssh(target_id: str) -> dict:
     credential disclosure.
     """
     return await probe_authenticated_ssh(target_id)
+
+@server.tool()
+async def remote_exec(target_id: str, scope_id: str, operation: str, filename: str = "") -> dict:
+    """Execute a bounded readback on an explicitly enrolled site scope.
+
+    No arbitrary shell commands, target paths or private keys are accepted.
+    """
+    return await scoped_remote_exec(target_id, scope_id, operation, filename)
+
+@server.tool()
+async def remote_file_transfer(target_id: str, scope_id: str, filename: str,
+                               content_base64: str, expected_sha256: str) -> dict:
+    """Transfer a checksum-pinned ZIP into an enrolled site scope via SSH/SCP.
+
+    Does not install, activate or execute the ZIP. Existing different ZIPs
+    are never overwritten; successful readback returns the exact digest.
+    """
+    return await scoped_remote_file_transfer(target_id, scope_id, filename,
+                                             content_base64, expected_sha256)
 
 @server.tool()
 def list_hostinger_hpanel_accounts() -> dict:
